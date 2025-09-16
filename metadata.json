@@ -1,0 +1,5 @@
+{
+  "name": "Story Mode AI",
+  "description": "An interactive storytelling application where users can create or select text-based scenarios and chat with AI-driven characters in real time, powered by the Gemini API.",
+  "requestFramePermissions": []
+}
