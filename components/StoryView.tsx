@@ -1,17 +1,32 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ChatMessage, ActiveChat, ModelResponsePart } from '../types';
-import { startChat, getInitialMessageStream, sendMessageStream } from '../services/geminiService';
-import { type Chat } from '@google/genai';
+import { ChatMessage, ActiveChat, ModelResponsePart, UserCharacter } from '../types';
+import { startChat, getInitialMessageStream, getInitialMessage, sendMessageStream, sendMessage } from '../services/geminiService';
+import { type Chat, type GenerateContentResponse } from '@google/genai';
 import { SendIcon, ArrowLeftIcon, RefreshCwIcon, SettingsIcon, EyeIcon, StarIcon, ChevronLeftIcon, ChevronRightIcon, LightbulbIcon, UserIcon } from './icons';
 import { CHAT_HISTORY_PREFIX } from '../constants/storageKeys';
 import StorySettingsModal from './StorySettingsModal';
+import CharacterCreation from './CharacterCreation';
+import MemoryBankModal from './MemoryBankModal';
 
 interface StoryViewProps {
   chat: ActiveChat;
-  onExit: () => void;
+  onExit: (finalMemoryBank: string[]) => void;
+  onUpdateUserCharacter: (chatId: string, updatedCharacter: UserCharacter) => void;
 }
 
-const StoryView: React.FC<StoryViewProps> = ({ chat, onExit }) => {
+type ResponseLength = 'Long' | 'Medium' | 'Short';
+
+interface StorySettings {
+  responseLength: ResponseLength;
+  streamTextResponses: boolean;
+  showResponseSuggestions: boolean;
+  customLlmInstructions: string;
+  model: string;
+}
+
+const emptyPart: ModelResponsePart = { narrative: '', suggestedActions: [] };
+
+const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharacter }) => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -19,47 +34,106 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit }) => {
   const chatSessionRef = useRef<Chat | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  
+  const [isCharacterEditorOpen, setCharacterEditorOpen] = useState(false);
+  const [isMemoryBankOpen, setMemoryBankOpen] = useState(false);
+  const [memoryBank, setMemoryBank] = useState<string[]>(chat.memoryBank || []);
+  const [storySettings, setStorySettings] = useState<StorySettings>({
+    responseLength: 'Medium',
+    streamTextResponses: true,
+    showResponseSuggestions: !chat.scenario.hideScenarioPrompts,
+    customLlmInstructions: '',
+    model: 'gemini-2.5-flash',
+  });
+
   const { scenario } = chat;
   const savedGameKey = `${CHAT_HISTORY_PREFIX}${chat.id}`;
   
-  const emptyPart: ModelResponsePart = { narrative: '', suggestedActions: [] };
+  const handleSettingsChange = (field: keyof StorySettings, value: any) => {
+    setStorySettings(prev => ({ ...prev, [field]: value }));
+  };
+  
+  const highlightText = (narrative: string) => {
+    let processedNarrative = narrative;
+    processedNarrative = processedNarrative.replace(/<dialogue>(.*?)<\/dialogue>/gs, '<span class="text-amber-400 font-medium">$1</span>');
+    processedNarrative = processedNarrative.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>');
+    return processedNarrative;
+  };
 
-  const processJsonResponseStream = async (stream: AsyncGenerator<any>, messageIdToUpdate: string, partIndexToUpdate: number) => {
-    let accumulatedJson = '';
-    let finalResponsePart: ModelResponsePart;
+  const parseModelResponse = (responseText: string): ModelResponsePart => {
     try {
-        for await (const chunk of stream) {
-            const chunkText = chunk.text;
-            accumulatedJson += chunkText;
-        }
-
-        const cleanedJson = accumulatedJson.replace(/^```json\s*|```\s*$/g, '').trim();
-        const rawParsed = JSON.parse(cleanedJson);
-        
-        finalResponsePart = {
-            narrative: rawParsed.narrative || 'The story seems to have paused. Try continuing.',
-            dialogue: rawParsed.dialogue,
-            suggestedActions: Array.isArray(rawParsed.actions) ? rawParsed.actions : []
-        };
-
+      const cleanedJson = responseText.replace(/^```json\s*|```\s*$/g, '').trim();
+      const rawParsed = JSON.parse(cleanedJson);
+      return {
+        narrative: rawParsed.narrative || 'The story seems to have paused. Try continuing.',
+        suggestedActions: Array.isArray(rawParsed.actions) ? rawParsed.actions : [],
+        memoryAdditions: Array.isArray(rawParsed.memory_additions) ? rawParsed.memory_additions : [],
+      };
     } catch (error) {
-        console.error("Failed to parse JSON response:", error, "Raw response:", accumulatedJson);
-        finalResponsePart = {
-            narrative: accumulatedJson || "An error occurred. I might have lost my train of thought.",
-            dialogue: undefined,
-            suggestedActions: []
-        };
+      console.error("Failed to parse JSON response:", error, "Raw response:", responseText);
+      return {
+        narrative: responseText || "An error occurred. I might have lost my train of thought.",
+        suggestedActions: [],
+      };
     }
-    
-    setChatHistory(prev => prev.map(msg => {
-        if (msg.id === messageIdToUpdate) {
-            const newParts = [...(msg.parts || [])];
-            newParts[partIndexToUpdate] = finalResponsePart;
-            return { ...msg, parts: newParts };
-        }
-        return msg;
-    }));
+  };
+
+  const streamAndParseResponse = async (
+    stream: AsyncGenerator<any>,
+    updateCallback: (narrativeChunk: string) => void
+  ): Promise<ModelResponsePart> => {
+    let accumulatedJson = '';
+    for await (const chunk of stream) {
+      const textChunk = chunk.text;
+      if (typeof textChunk === 'string') {
+        accumulatedJson += textChunk;
+      }
+      
+      const narrativeKey = '"narrative": "';
+      const narrativeStartIndex = accumulatedJson.lastIndexOf(narrativeKey);
+      let streamingNarrative = '...';
+
+      if (narrativeStartIndex > -1) {
+        let narrativeContent = accumulatedJson.substring(narrativeStartIndex + narrativeKey.length);
+        // Clean up potential trailing JSON structure for smoother streaming display
+        narrativeContent = narrativeContent.replace(/",\s*"(actions|memory_additions)":.*/s, '');
+        // Clean up escaped characters for rendering
+        streamingNarrative = narrativeContent
+          .replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\'/g, "'").replace(/\\\\/g, '\\').replace(/"$/, '');
+      }
+      updateCallback(streamingNarrative);
+    }
+    return parseModelResponse(accumulatedJson);
+  };
+  
+  const handleModelResponse = (finalPart: ModelResponsePart, messageId: string, partIndex: number) => {
+      // Update memory bank
+      const newMemories = (finalPart.memoryAdditions || []).filter(m => typeof m === 'string' && m.trim() !== '');
+      if (newMemories.length > 0) {
+        setMemoryBank(prev => [...new Set([...prev, ...newMemories])]);
+      }
+
+      // Update chat history with the final, complete part
+      setChatHistory(prev => prev.map(msg => {
+          if (msg.id === messageId) {
+              const newParts = [...(msg.parts || [])];
+              newParts[partIndex] = finalPart;
+              // If this is a regeneration, also update the current index
+              if (partIndex > msg.currentPartIndex) {
+                  return { ...msg, parts: newParts, currentPartIndex: partIndex };
+              }
+              return { ...msg, parts: newParts };
+          }
+          return msg;
+      }));
+      
+      setIsLoading(false);
+  };
+  
+  const handleError = (error: any, messageId: string) => {
+    console.error("Failed to get model response:", error);
+    const errorPart: ModelResponsePart = { narrative: "An error occurred. I might have lost my train of thought.", suggestedActions: [] };
+    setChatHistory(prev => prev.map(msg => msg.id === messageId ? { ...msg, parts: [errorPart] } : msg));
+    setIsLoading(false);
   };
 
   const initializeStory = useCallback(async () => {
@@ -69,7 +143,12 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit }) => {
     const savedHistoryRaw = localStorage.getItem(savedGameKey);
     const savedHistory = savedHistoryRaw ? (JSON.parse(savedHistoryRaw) as ChatMessage[]) : [];
 
-    chatSessionRef.current = startChat(scenario, chat.userCharacter, savedHistory);
+    const settingsForChat = {
+        responseLength: storySettings.responseLength,
+        customInstructions: storySettings.customLlmInstructions,
+        model: storySettings.model
+    };
+    chatSessionRef.current = startChat(scenario, chat.userCharacter, savedHistory, memoryBank, settingsForChat);
 
     if (savedHistory.length > 0) {
       setChatHistory(savedHistory);
@@ -77,24 +156,33 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit }) => {
       return;
     }
 
-    try {
-      const newModelMessage: ChatMessage = { id: `model-${Date.now()}`, role: 'model', parts: [emptyPart], currentPartIndex: 0 };
-      setChatHistory([newModelMessage]);
-      
-      const stream = await getInitialMessageStream(chatSessionRef.current);
-      await processJsonResponseStream(stream, newModelMessage.id, 0);
+    const newModelMessage: ChatMessage = { id: `model-${Date.now()}`, role: 'model', parts: [emptyPart], currentPartIndex: 0 };
+    setChatHistory([newModelMessage]);
 
+    try {
+        let finalPart: ModelResponsePart;
+        if (storySettings.streamTextResponses) {
+            const stream = await getInitialMessageStream(chatSessionRef.current);
+            const updateStreamingHistory = (narrativeChunk: string) => {
+                setChatHistory(prev => prev.map(msg => {
+                    if (msg.id === newModelMessage.id) {
+                        const newParts = [...msg.parts!];
+                        newParts[msg.currentPartIndex] = { ...newParts[msg.currentPartIndex], narrative: narrativeChunk };
+                        return { ...msg, parts: newParts };
+                    }
+                    return msg;
+                }));
+            };
+            finalPart = await streamAndParseResponse(stream, updateStreamingHistory);
+        } else {
+            const response = await getInitialMessage(chatSessionRef.current);
+            finalPart = parseModelResponse(response.text);
+        }
+        handleModelResponse(finalPart, newModelMessage.id, 0);
     } catch (error) {
-      console.error("Failed to start story:", error);
-      const errorPart: ModelResponsePart = {
-          narrative: "Sorry, I couldn't start the story. Please check the API key and try again.",
-          suggestedActions: []
-      };
-      setChatHistory([{ id: `model-error-${Date.now()}`, role: 'model', parts: [errorPart], currentPartIndex: 0 }]);
-    } finally {
-        setIsLoading(false);
+        handleError(error, newModelMessage.id);
     }
-  }, [scenario, chat.userCharacter, savedGameKey]);
+  }, [scenario, chat.userCharacter, savedGameKey, storySettings, memoryBank]);
 
   useEffect(() => {
     initializeStory();
@@ -110,52 +198,49 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit }) => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
-  }, [chatHistory, chatContainerRef.current?.scrollHeight]); // Trigger on scrollHeight change
+  }, [chatHistory, chatContainerRef.current?.scrollHeight]);
   
   const handleSendMessage = async (messageText: string) => {
     if (!messageText.trim() || isLoading) return;
 
     const newUserMessage: ChatMessage = { id: `user-${Date.now()}`, role: 'user', text: messageText, currentPartIndex: 0 };
     const currentHistory = [...chatHistory, newUserMessage];
-    setChatHistory(currentHistory);
     setUserInput('');
-    
     setIsLoading(true);
     
-    chatSessionRef.current = startChat(scenario, chat.userCharacter, currentHistory);
+    const settingsForChat = {
+        responseLength: storySettings.responseLength,
+        customInstructions: storySettings.customLlmInstructions,
+        model: storySettings.model
+    };
+    chatSessionRef.current = startChat(scenario, chat.userCharacter, currentHistory, memoryBank, settingsForChat);
 
     const newModelMessage: ChatMessage = { id: `model-${Date.now()}`, role: 'model', parts: [emptyPart], currentPartIndex: 0 };
-    setChatHistory(prev => [...prev, newModelMessage]);
+    setChatHistory([...currentHistory, newModelMessage]);
 
     try {
-      const stream = await sendMessageStream(chatSessionRef.current, messageText);
-      await processJsonResponseStream(stream, newModelMessage.id, 0);
+      let finalPart: ModelResponsePart;
+      if (storySettings.streamTextResponses) {
+        const stream = await sendMessageStream(chatSessionRef.current, messageText);
+        const updateStreamingHistory = (narrativeChunk: string) => {
+            setChatHistory(prev => prev.map(msg => {
+                if (msg.id === newModelMessage.id) {
+                    const newParts = [...msg.parts!];
+                    newParts[msg.currentPartIndex] = { ...newParts[msg.currentPartIndex], narrative: narrativeChunk };
+                    return { ...msg, parts: newParts };
+                }
+                return msg;
+            }));
+        };
+        finalPart = await streamAndParseResponse(stream, updateStreamingHistory);
+      } else {
+        const response = await sendMessage(chatSessionRef.current, messageText);
+        finalPart = parseModelResponse(response.text);
+      }
+      handleModelResponse(finalPart, newModelMessage.id, 0);
     } catch (error) {
-      console.error("Failed to get model response:", error);
-      const errorPart: ModelResponsePart = { narrative: "An error occurred. I might have lost my train of thought.", suggestedActions: [] };
-      setChatHistory(prev => prev.map(msg => msg.id === newModelMessage.id ? { ...msg, parts: [errorPart] } : msg));
-    } finally {
-      setIsLoading(false);
+      handleError(error, newModelMessage.id);
     }
-  };
-  
-  const highlightText = (narrative: string, textToHighlight?: string) => {
-    let processedNarrative = narrative;
-
-    // First, wrap the dialogue in a span for highlighting.
-    // This is done before markdown processing to ensure `includes()` works correctly,
-    // as markdown conversion would alter the narrative string.
-    if (textToHighlight && textToHighlight.trim() && processedNarrative.includes(textToHighlight)) {
-        const highlighted = `<span class="text-amber-400 font-medium">${textToHighlight}</span>`;
-        // Replace only the first occurrence to avoid potential issues.
-        processedNarrative = processedNarrative.replace(textToHighlight, highlighted);
-    }
-    
-    // Second, process markdown for bold (**) and italics (*).
-    // This will correctly transform markdown even within the highlighted span.
-    processedNarrative = processedNarrative.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>');
-
-    return processedNarrative;
   };
   
   const lastModelMessage = chatHistory.filter(m => m.role === 'model').slice(-1)[0];
@@ -167,22 +252,40 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit }) => {
     setIsLoading(true);
     
     const historyForRegen = chatHistory.slice(0, -1);
-    chatSessionRef.current = startChat(scenario, chat.userCharacter, historyForRegen);
+    const settingsForChat = {
+        responseLength: storySettings.responseLength,
+        customInstructions: storySettings.customLlmInstructions,
+        model: storySettings.model
+    };
+    chatSessionRef.current = startChat(scenario, chat.userCharacter, historyForRegen, memoryBank, settingsForChat);
     
+    const newPartIndex = lastModelMessage.parts?.length || 0;
+    setChatHistory(prev => prev.map(msg => 
+        msg.id === lastModelMessage.id ? { ...msg, parts: [...(msg.parts || []), emptyPart] } : msg
+    ));
+
     try {
-        const stream = await sendMessageStream(chatSessionRef.current, lastUserMessage.text!);
-        await processJsonResponseStream(stream, lastModelMessage.id, lastModelMessage.parts?.length || 0);
-        
-        setChatHistory(prev => prev.map(msg => {
-            if (msg.id === lastModelMessage.id) {
-                return { ...msg, currentPartIndex: (msg.parts?.length || 1) - 1 };
-            }
-            return msg;
-        }));
+        let finalPart: ModelResponsePart;
+        if (storySettings.streamTextResponses) {
+            const stream = await sendMessageStream(chatSessionRef.current, lastUserMessage.text!);
+            const updateStreamingHistory = (narrativeChunk: string) => {
+                setChatHistory(prev => prev.map(msg => {
+                    if (msg.id === lastModelMessage.id) {
+                        const newParts = [...msg.parts!];
+                        newParts[newPartIndex] = { ...newParts[newPartIndex], narrative: narrativeChunk };
+                        return { ...msg, parts: newParts };
+                    }
+                    return msg;
+                }));
+            };
+            finalPart = await streamAndParseResponse(stream, updateStreamingHistory);
+        } else {
+            const response = await sendMessage(chatSessionRef.current, lastUserMessage.text!);
+            finalPart = parseModelResponse(response.text);
+        }
+        handleModelResponse(finalPart, lastModelMessage.id, newPartIndex);
     } catch (error) {
-        console.error("Failed to regenerate response:", error);
-    } finally {
-        setIsLoading(false);
+       handleError(error, lastModelMessage.id);
     }
   };
 
@@ -202,6 +305,16 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit }) => {
     }));
   };
 
+  const handleEditCharacter = () => {
+    setIsSettingsOpen(false);
+    setCharacterEditorOpen(true);
+  };
+  
+  const handleViewMemoryBank = () => {
+    setIsSettingsOpen(false);
+    setMemoryBankOpen(true);
+  };
+
   return (
     <>
       <div className="w-full h-screen flex flex-col bg-[#0F0F0F] text-slate-200 font-sans">
@@ -209,7 +322,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit }) => {
         <header className="flex-shrink-0 p-4 pt-6">
             <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                    <button onClick={onExit} className="text-slate-400 hover:text-white transition-colors p-1.5 rounded-full hover:bg-slate-800" aria-label="Exit story"><ArrowLeftIcon className="w-5 h-5"/></button>
+                    <button onClick={() => onExit(memoryBank)} className="text-slate-400 hover:text-white transition-colors p-1.5 rounded-full hover:bg-slate-800" aria-label="Exit story"><ArrowLeftIcon className="w-5 h-5"/></button>
                     <img src={scenario.image || `https://source.unsplash.com/random/40x40?${scenario.tags[0]}`} alt={scenario.name} className="w-10 h-10 rounded-full object-cover"/>
                     <div>
                       <h2 className="font-bold text-white">{scenario.name}</h2>
@@ -232,108 +345,123 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit }) => {
                     return (
                         <div key={msg.id} className="flex justify-center items-center gap-3 my-8">
                             <UserIcon className="w-6 h-6 text-slate-500 flex-shrink-0" />
-                            <p className="text-slate-400 italic text-center">
-                                {msg.text}
-                            </p>
+                            <p className="text-slate-300 italic max-w-2xl text-center">{msg.text}</p>
+                        </div>
+                    );
+                } else { // Model message
+                    const currentPart = msg.parts ? msg.parts[msg.currentPartIndex] : null;
+                    const narrativeToRender = currentPart?.narrative || '';
+
+                    return (
+                        <div 
+                            key={msg.id}
+                            className="flex flex-col items-center my-6"
+                            onMouseEnter={() => setHoveredMessageId(msg.id)}
+                            onMouseLeave={() => setHoveredMessageId(null)}
+                        >
+                            <div className="w-full max-w-3xl leading-relaxed text-slate-300 prose prose-invert prose-p:text-slate-300">
+                                {narrativeToRender ? (
+                                    <div
+                                        dangerouslySetInnerHTML={{ __html: highlightText(narrativeToRender) }} 
+                                    />
+                                ) : (
+                                  isLoading && <div className="w-full h-8" /> // Placeholder for loading
+                                )}
+                            </div>
+                            
+                            {/* Actions & Regeneration */}
+                            <div className={`transition-opacity duration-300 w-full max-w-3xl mt-4 flex items-center justify-center ${hoveredMessageId === msg.id || (msg.id === lastModelMessage?.id && isLoading) ? 'opacity-100' : 'opacity-0'}`}>
+                                {msg.id === lastModelMessage?.id && !isLoading && (
+                                     <button onClick={handleRegenerate} title="Regenerate Response" className="p-2 text-slate-400 hover:text-sky-400 transition-colors rounded-full hover:bg-slate-800">
+                                        <RefreshCwIcon className="w-4 h-4"/>
+                                    </button>
+                                )}
+                                {msg.parts && msg.parts.length > 1 && (
+                                    <div className="flex items-center gap-2 text-sm ml-4">
+                                        <button onClick={() => handleChangePart(msg.id, 'prev')} className="p-1 rounded-full hover:bg-slate-800"><ChevronLeftIcon className="w-5 h-5"/></button>
+                                        <span>{msg.currentPartIndex + 1} / {msg.parts.length}</span>
+                                        <button onClick={() => handleChangePart(msg.id, 'next')} className="p-1 rounded-full hover:bg-slate-800"><ChevronRightIcon className="w-5 h-5"/></button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     );
                 }
-
-                // Model message
-                const isLastModelMessage = msg.id === lastModelMessage?.id;
-                const currentPart = msg.parts?.[msg.currentPartIndex];
-                const hasMultipleParts = (msg.parts?.length || 0) > 1;
-
-                return (
-                    <div key={msg.id} className="mb-6 relative" onMouseEnter={() => setHoveredMessageId(msg.id)} onMouseLeave={() => setHoveredMessageId(null)}>
-                        {/* Hover controls */}
-                        {hoveredMessageId === msg.id && (
-                            <div className="absolute top-2 right-2 z-10 bg-slate-800/80 backdrop-blur-sm rounded-lg border border-slate-700 flex items-center text-white text-xs">
-                               {hasMultipleParts && (
-                                    <>
-                                        <button onClick={() => handleChangePart(msg.id, 'prev')} className="p-2 hover:bg-slate-700 rounded-l-lg transition-colors"><ChevronLeftIcon className="w-4 h-4"/></button>
-                                        <span className="font-mono px-2 select-none">{msg.currentPartIndex + 1}/{msg.parts!.length}</span>
-                                        <button onClick={() => handleChangePart(msg.id, 'next')} className="p-2 hover:bg-slate-700 rounded-r-lg transition-colors border-l border-slate-700"><ChevronRightIcon className="w-4 h-4"/></button>
-                                    </>
-                                )}
-                                {isLastModelMessage && (
-                                    <button onClick={handleRegenerate} disabled={isLoading} className="p-2 hover:bg-slate-700 rounded-lg transition-colors disabled:text-slate-500 disabled:cursor-not-allowed">
-                                        <RefreshCwIcon className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`}/>
-                                    </button>
-                                )}
-                            </div>
-                        )}
-                        <div className="flex items-center gap-3 mb-3">
-                            <img src={scenario.image || `https://source.unsplash.com/random/40x40?${scenario.tags[0]}`} alt="scenario" className="w-10 h-10 rounded-full object-cover"/>
-                            <div>
-                                <p className="font-bold text-white">{scenario.name}</p>
-                            </div>
-                        </div>
-                        <div className="pl-12 text-slate-300 space-y-4 leading-relaxed selection:bg-sky-400/30">
-                            {isLoading && msg.id === lastModelMessage?.id && !currentPart?.narrative ? (
-                                <div className="flex items-center gap-2">
-                                    <span className="inline-block w-2 h-5 bg-slate-600 rounded-full animate-pulse"></span>
-                                    <span className="inline-block w-2 h-5 bg-slate-600 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></span>
-                                    <span className="inline-block w-2 h-5 bg-slate-600 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></span>
-                                </div>
-                            ) : (
-                                currentPart?.narrative.split('\n').filter(p => p.trim()).map((paragraph, pIndex) => (
-                                    <p key={pIndex} dangerouslySetInnerHTML={{ __html: highlightText(paragraph, currentPart.dialogue) }} />
-                                ))
-                            )}
-                        </div>
-                    </div>
-                );
             })}
-             {/* Suggested Actions */}
-             {!isLoading && !scenario.hideScenarioPrompts && lastModelMessage && lastModelMessage.parts![lastModelMessage.currentPartIndex].suggestedActions.length > 0 && (
-                <div className="pl-12 mt-8 space-y-3">
-                    {lastModelMessage.parts![lastModelMessage.currentPartIndex].suggestedActions.map((action, i) => (
-                         <button 
-                            key={i} 
+            {isLoading && (
+                <div className="flex justify-center items-center gap-2 mt-4">
+                    <div className="w-2 h-2 bg-slate-500 rounded-full animate-pulse [animation-delay:-0.3s]"></div>
+                    <div className="w-2 h-2 bg-slate-500 rounded-full animate-pulse [animation-delay:-0.15s]"></div>
+                    <div className="w-2 h-2 bg-slate-500 rounded-full animate-pulse"></div>
+                </div>
+            )}
+        </div>
+
+        {/* Action Suggestions */}
+        {storySettings.showResponseSuggestions && lastModelMessage && lastModelMessage.parts && lastModelMessage.parts[lastModelMessage.currentPartIndex]?.suggestedActions.length > 0 && !isLoading && (
+            <div className="flex-shrink-0 p-4 pt-0">
+                <div className="flex overflow-x-auto gap-3 pb-2 -mx-4 px-4">
+                    {lastModelMessage.parts[lastModelMessage.currentPartIndex].suggestedActions.map((action, index) => (
+                        <button 
+                            key={index}
                             onClick={() => handleSendMessage(action)}
-                            className="w-full text-left bg-[#252525] hover:bg-[#333] border border-slate-700 rounded-xl px-5 py-3.5 transition-colors group"
-                          >
-                            <span className="text-slate-500 group-hover:text-slate-400 mr-4 transition-colors">{i + 1}.</span>
-                            <span className="text-slate-300">{action}</span>
-                         </button>
+                            className="flex-shrink-0 flex items-center gap-2 bg-slate-800/70 border border-slate-700 backdrop-blur-sm text-slate-300 px-4 py-2 rounded-full hover:bg-slate-700/80 hover:border-sky-500 transition-all text-sm"
+                        >
+                            <LightbulbIcon className="w-4 h-4 text-sky-400"/>
+                            {action}
+                        </button>
                     ))}
                 </div>
-              )}
-               {isLoading && chatHistory.length === 0 && (
-                  <div className="text-center text-slate-400">Loading story...</div>
-              )}
-        </div>
+            </div>
+        )}
 
-        {/* Input Footer */}
-        <div className="p-4 bg-[#0F0F0F] flex-shrink-0">
-          <div className="relative">
-            <textarea
-              value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
-              onKeyPress={(e) => {if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); handleSendMessage(userInput);}}}
-              placeholder="Write how the story continues"
-              className="w-full bg-[#252525] border border-slate-700 rounded-xl py-3 pl-12 pr-12 text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors resize-none"
-              rows={1}
-              disabled={isLoading}
-              aria-label="Your next action"
-            />
-            <button className="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-500 hover:text-yellow-400 transition-colors" aria-label="Get suggestion">
-                <LightbulbIcon className="w-6 h-6"/>
-            </button>
-            <button
-              onClick={() => handleSendMessage(userInput)}
-              disabled={isLoading || !userInput.trim()}
-              className="absolute inset-y-0 right-0 flex items-center pr-4 text-slate-400 hover:text-sky-400 disabled:text-slate-600 disabled:cursor-not-allowed transition-colors"
-              aria-label="Send message"
-            >
-              <SendIcon className="w-6 h-6" />
-            </button>
-          </div>
-           <p className="text-center text-xs text-slate-600 mt-2">Everything the AI generates is fictional and shouldn't be taken seriously!</p>
-        </div>
+        {/* Input Area */}
+        <footer className="flex-shrink-0 p-4">
+            <div className="w-full max-w-3xl mx-auto">
+                <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(userInput); }}>
+                    <div className="relative">
+                        <input
+                          type="text"
+                          value={userInput}
+                          onChange={(e) => setUserInput(e.target.value)}
+                          placeholder="What do you do next?"
+                          disabled={isLoading}
+                          className="w-full bg-[#1e1f22] border border-slate-700 text-slate-200 rounded-full py-3 pl-5 pr-14 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors disabled:opacity-50"
+                        />
+                        <button type="submit" disabled={isLoading || !userInput.trim()} className="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-sky-600 text-white hover:bg-sky-500 transition-colors disabled:bg-slate-600 disabled:cursor-not-allowed">
+                          <SendIcon className="w-5 h-5" />
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </footer>
       </div>
-      {isSettingsOpen && <StorySettingsModal scenario={scenario} onClose={() => setIsSettingsOpen(false)} />}
+      {isSettingsOpen && (
+        <StorySettingsModal 
+          onClose={() => setIsSettingsOpen(false)} 
+          settings={storySettings} 
+          onSettingsChange={handleSettingsChange}
+          onEditCharacter={handleEditCharacter}
+          onViewMemoryBank={handleViewMemoryBank}
+        />
+      )}
+      {isCharacterEditorOpen && (
+        <CharacterCreation
+          onClose={() => setCharacterEditorOpen(false)}
+          onSave={(updatedCharacter) => {
+            onUpdateUserCharacter(chat.id, updatedCharacter);
+            setCharacterEditorOpen(false);
+          }}
+          initialCharacter={chat.userCharacter}
+        />
+      )}
+      {isMemoryBankOpen && (
+        <MemoryBankModal
+          onClose={() => setMemoryBankOpen(false)}
+          memories={memoryBank}
+          onUpdateMemories={setMemoryBank}
+        />
+      )}
     </>
   );
 };

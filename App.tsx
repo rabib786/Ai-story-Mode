@@ -9,7 +9,7 @@ import BottomNavBar from './components/BottomNavBar';
 import ScenarioEditor from './components/ScenarioEditor';
 import ProfileScreen from './components/ProfileScreen';
 import ChatsScreen from './components/ChatsScreen';
-import { ACTIVE_CHATS_KEY, SCENARIOS_KEY } from './constants/storageKeys';
+import { ACTIVE_CHATS_KEY, SCENARIOS_KEY, CHAT_HISTORY_PREFIX } from './constants/storageKeys';
 
 type Screen = 'scenario_selector' | 'character_selector' | 'story_view' | 'scenario_editor' | 'profile' | 'chats_list';
 type View = 'home' | 'search' | 'create' | 'chats' | 'profile';
@@ -69,7 +69,8 @@ const App: React.FC = () => {
       id,
       scenario: scenarioForSelection,
       userCharacter: character,
-      lastUpdate: Date.now()
+      lastUpdate: Date.now(),
+      memoryBank: [],
     };
     
     const updatedChats = [newChat, ...activeChats.filter(c => c.id !== id)]; // Add new, remove old if re-creating
@@ -81,11 +82,11 @@ const App: React.FC = () => {
     setCurrentScreen('story_view');
   }, [scenarioForSelection, activeChats]);
 
-  const handleExitStory = useCallback(() => {
+  const handleExitStory = useCallback((finalMemoryBank: string[]) => {
     if (currentChat) {
-      // Update the timestamp of the current chat session
+      // Update the timestamp and memory bank of the current chat session
       const updatedChats = activeChats.map(c => 
-        c.id === currentChat.id ? { ...c, lastUpdate: Date.now() } : c
+        c.id === currentChat.id ? { ...c, lastUpdate: Date.now(), memoryBank: finalMemoryBank } : c
       );
       // Sort by most recent
       updatedChats.sort((a, b) => b.lastUpdate - a.lastUpdate);
@@ -101,15 +102,14 @@ const App: React.FC = () => {
     setCurrentScreen('story_view');
   };
 
-  const handleDeleteChat = (chatId: string) => {
+  const handleDeleteChat = useCallback((chatId: string) => {
     if (window.confirm('Are you sure you want to permanently delete this chat history?')) {
       const updatedChats = activeChats.filter(c => c.id !== chatId);
       setActiveChats(updatedChats);
       localStorage.setItem(ACTIVE_CHATS_KEY, JSON.stringify(updatedChats));
-      // Also delete the chat history from storage
-      localStorage.removeItem(`storymode_chat_history_${chatId}`);
+      localStorage.removeItem(`${CHAT_HISTORY_PREFIX}${chatId}`);
     }
-  };
+  }, [activeChats]);
 
   const handleBackToScenarioSelection = useCallback(() => {
     setScenarioForSelection(null);
@@ -139,7 +139,7 @@ const App: React.FC = () => {
     setCurrentScreen('scenario_selector');
   };
 
-  const handleDeleteScenario = (scenarioNameToDelete: string) => {
+  const handleDeleteScenario = useCallback((scenarioNameToDelete: string) => {
     const isScenarioInUse = activeChats.some(chat => chat.scenario.name === scenarioNameToDelete);
 
     if (isScenarioInUse) {
@@ -152,8 +152,23 @@ const App: React.FC = () => {
       setScenarios(updatedScenarios);
       localStorage.setItem(SCENARIOS_KEY, JSON.stringify(updatedScenarios));
     }
-  };
+  }, [activeChats, scenarios]);
   
+  const handleUpdateUserCharacter = (chatId: string, updatedCharacter: UserCharacter) => {
+    const chatToUpdate = activeChats.find(c => c.id === chatId);
+    if (!chatToUpdate) return;
+    
+    const updatedChat = { ...chatToUpdate, userCharacter: updatedCharacter, lastUpdate: Date.now() };
+    
+    const updatedChats = activeChats.map(c => c.id === chatId ? updatedChat : c);
+    setActiveChats(updatedChats);
+    localStorage.setItem(ACTIVE_CHATS_KEY, JSON.stringify(updatedChats));
+
+    if (currentChat?.id === chatId) {
+        setCurrentChat(updatedChat);
+    }
+  };
+
   const getActiveView = (): View => {
     switch(currentScreen) {
         case 'scenario_editor': return 'create';
@@ -188,6 +203,7 @@ const App: React.FC = () => {
             key={currentChat!.id}
             chat={currentChat!}
             onExit={handleExitStory}
+            onUpdateUserCharacter={handleUpdateUserCharacter}
           />
         );
       case 'scenario_selector':

@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { UserCharacter } from '../types';
 import CharacterCreation from './CharacterCreation';
@@ -96,7 +97,7 @@ const CharacterSelector: React.FC<CharacterSelectorProps> = ({ onCharacterSelect
       {isCreating && (
         <CharacterCreation 
           onClose={() => setIsCreating(false)}
-          onCharacterCreated={handleSaveNewCharacter}
+          onSave={handleSaveNewCharacter}
         />
       )}
     </>

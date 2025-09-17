@@ -1,4 +1,3 @@
-
 import { Scenario } from '../types';
 
 export const PREBUILT_SCENARIOS: Scenario[] = [
@@ -6,15 +5,15 @@ export const PREBUILT_SCENARIOS: Scenario[] = [
     name: "Life Experiment",
     description: "Her voice was a low purr, almost a sigh, as she let her hands pause above the cutting board. The heat from the stove and the lingering scent of spices wrapped around them both...",
     image: "https://images.unsplash.com/photo-1556911220-bff31c812dba?q=80&w=2970&auto=format&fit=crop",
-    tags: ["Slice of Life", "Romance", "FictionLab"],
+    tags: ["Slice of Life", "Romance"],
     worldDetails: "A cozy, modern home kitchen in a vibrant American city. The time is late afternoon, with golden light filtering through the windows. The atmosphere is calm, intimate, and filled with the warm smells of cooking.",
-    customInstructions: "You are narrating a slice-of-life romantic story. The user plays as Steve. The story begins with Steve coming up behind his partner, Elizabeth, while she is cooking. Narrate her reaction. Her first line of dialogue MUST be 'Don't be a stranger, love,'. Continue the narrative, focusing on sensory details, emotions, and realistic dialogue. Elizabeth is teasing Steve about being away in the yard for a long time.",
+    customInstructions: "You are narrating a slice-of-life romantic story. The user plays as {{user}}. The story begins with {{user}} coming up behind his partner, Elizabeth, while she is cooking. Narrate her reaction. Her first line of dialogue MUST be 'Don't be a stranger, love,'. Continue the narrative, focusing on sensory details, emotions, and realistic dialogue. Elizabeth is teasing {{user}} about being away in the yard for a long time.",
     characters: [
       {
         name: "Elizabeth",
-        role: "Steve's partner",
-        personality: "Warm, loving, playful, and deeply in love with Steve. She's been looking forward to this quiet moment with him.",
-        backstory: "She and Steve have a comfortable, established relationship. They live together in this home. She enjoys cooking, especially his favorite meals.",
+        role: "{{user}}'s partner",
+        personality: "Warm, loving, playful, and deeply in love with {{user}}. She's been looking forward to this quiet moment with him.",
+        backstory: "She and {{user}} have a comfortable, established relationship. They live together in this home. She enjoys cooking, especially his favorite meals.",
       },
     ],
     views: 0,

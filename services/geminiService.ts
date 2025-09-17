@@ -10,25 +10,47 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 const responseSchema = {
   type: Type.OBJECT,
   properties: {
-    narrative: { type: Type.STRING, description: 'The story continuation, including environment descriptions and character actions. Narrate in the third person.' },
-    dialogue: { type: Type.STRING, description: "A single, complete, direct quote of speech from an NPC in the narrative. This text must be an exact substring of the narrative. If there is no dialogue, return an empty string." },
+    narrative: { type: Type.STRING, description: 'The story continuation, including environment descriptions and character actions. Narrate in the third person. Any spoken dialogue MUST be wrapped in <dialogue> tags.' },
     actions: {
       type: Type.ARRAY,
       items: { type: Type.STRING },
       description: "A list of 2 to 3 distinct, concise, and compelling actions the player could take next. Phrase them from the player's perspective (e.g., 'Check the drawers', 'Ask her about the noise')."
+    },
+    memory_additions: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+      description: "A list of concise, key facts, events, or relationship changes from the narrative to be added to the memory bank. These should capture plot-critical actions, significant character interactions, and shifts in relationships. Examples: '{{user}} acquired the Serpent's Eye gem.', '{{user}} promised to help Elara.', 'Lisa's relationship with {{user}} has become romantic after they kissed.'"
     }
   }
 };
 
-function buildSystemInstruction(scenario: Scenario, userCharacter: UserCharacter): string {
+function buildSystemInstruction(
+  scenario: Scenario, 
+  userCharacter: UserCharacter,
+  memoryBank: string[],
+  settings: { responseLength: 'Long' | 'Medium' | 'Short', customInstructions: string }
+): string {
+  // Helper to replace {{user}} placeholder with the actual user character's name
+  const replaceUser = (text: string) => text.replace(/{{user}}/gi, userCharacter.name);
+
   const characterDescriptions = scenario.characters
-    .map(c => `- ${c.name} (${c.role}): ${c.personality}. Backstory: ${c.backstory}`)
+    .map(c => `- ${c.name} (${replaceUser(c.role)}): ${replaceUser(c.personality)}. Backstory: ${replaceUser(c.backstory)}`)
     .join('\n');
 
-  const customInstructionsWithAdvisory = scenario.customInstructions + 
+  const customInstructionsWithAdvisory = replaceUser(scenario.customInstructions) + 
     (scenario.sensitiveContent 
       ? "\n\n**Content Advisory:** This scenario is marked for sensitive content (18+). Handle mature themes with narrative weight and discretion." 
       : "");
+      
+  const worldDetails = replaceUser(scenario.worldDetails);
+
+  const lengthInstruction = `Your response should be of ${settings.responseLength.toLowerCase()} length.`;
+  const sessionInstructions = settings.customInstructions ? `\n**Custom Session Instructions:**\n${settings.customInstructions}` : '';
+  
+  const memoryBankContent = memoryBank.length > 0 
+    ? memoryBank.map(m => `- ${replaceUser(m)}`).join('\n') 
+    : 'No memories yet.';
+
 
   return `
 You are an expert storyteller and game master for an interactive text-based adventure.
@@ -37,14 +59,21 @@ Adhere strictly to the following rules:
 1.  **Acknowledge the Protagonist:** The user is playing as their own character, who is the protagonist of this story. Their details are below. Address them by name and weave their backstory into the narrative.
 2.  **Stay in Character:** Portray all non-player characters (NPCs) according to their defined personalities and roles.
 3.  **Describe the World:** Richly describe the environment, sounds, and atmosphere based on the World Details to bring the setting to life.
-4.  **Drive the Narrative:** Respond to the user's actions and advance the plot. Introduce challenges, mysteries, or conflicts.
+4.  **Drive the Narrative:** Respond to the user's actions and advance the plot. Introduce challenges, mysteries, or conflicts. Your primary goal is to maintain a seamless, immersive narrative. Ensure consistent tone, pacing, and logical progression. Eliminate lag, repetition, or unnatural pauses. The story must feel like a continuous, evolving experience.
 5.  **Acknowledge User's Actions:** Your response must directly follow and react to the user's last message.
 6.  **Follow Instructions:** Strictly adhere to the Custom Scenario Instructions provided.
-7.  **JSON Output:** YOU MUST ALWAYS respond with a JSON object that conforms to the provided schema. Provide a narrative, any spoken dialogue as a separate string, and a list of suggested actions for the player.
+7.  **Use the Memory Bank for Continuity and Evolution:** The Memory Bank contains established facts. You MUST refer to it to maintain story consistency. More importantly, use these memories to evolve the world and character relationships. For example, if a memory states 'Lisa and {{user}} shared a kiss', future interactions with Lisa should reflect this newfound intimacy. Promises made should be remembered, and conflicts should have lasting consequences.
+8.  **Response Length:** ${lengthInstruction}
+9.  **JSON Output:** YOU MUST ALWAYS respond with a JSON object that conforms to the provided schema. Provide a narrative, a list of suggested actions for the player, and a list of key events to add to the memory bank.
+10. **Dialogue Formatting:** When an NPC speaks, you MUST wrap their exact dialogue directly within the narrative text using <dialogue> and </dialogue> tags. For example: \`She looked up and said, <dialogue>Hello, {{user}}.</dialogue>\`
 
 --- PLAYER CHARACTER ---
 Name: ${userCharacter.name}
 Description: ${userCharacter.description}
+
+--- MEMORY BANK ---
+Here are key facts and events that have happened so far. Use them to maintain consistency and evolve the story.
+${memoryBankContent}
 
 --- SCENARIO BRIEFING ---
 
@@ -52,13 +81,13 @@ Description: ${userCharacter.description}
 **Tags:** ${scenario.tags.join(', ')}
 
 **World Details:**
-${scenario.worldDetails}
+${worldDetails}
 
 **Characters to Portray:**
 ${characterDescriptions}
 
 **Custom Scenario Instructions:**
-${customInstructionsWithAdvisory}
+${customInstructionsWithAdvisory}${sessionInstructions}
 
 --- STORY BEGINS ---
 You will begin the story now. Provide an engaging opening paragraph that addresses the player character by name and draws them into the world. Do not greet the user or break character.
@@ -78,12 +107,18 @@ function formatHistoryForGemini(history: ChatMessage[]): Content[] {
 }
 
 
-export const startChat = (scenario: Scenario, userCharacter: UserCharacter, history: ChatMessage[] = []): Chat => {
-  const systemInstruction = buildSystemInstruction(scenario, userCharacter);
+export const startChat = (
+  scenario: Scenario, 
+  userCharacter: UserCharacter, 
+  history: ChatMessage[] = [],
+  memoryBank: string[] = [],
+  settings: { responseLength: 'Long' | 'Medium' | 'Short', customInstructions: string, model?: string }
+): Chat => {
+  const systemInstruction = buildSystemInstruction(scenario, userCharacter, memoryBank, settings);
   const geminiHistory = formatHistoryForGemini(history);
 
   const chat = ai.chats.create({
-    model: 'gemini-2.5-flash',
+    model: settings.model || 'gemini-2.5-flash',
     history: geminiHistory,
     config: {
       systemInstruction: systemInstruction,
@@ -96,12 +131,24 @@ export const startChat = (scenario: Scenario, userCharacter: UserCharacter, hist
 
 export const getInitialMessageStream = async (chat: Chat) => {
   // The system instruction already prompts the AI to begin.
-  // We send an empty message to trigger the initial response.
+  // We send a simple string message to trigger the initial response.
+  // FIX: chat.sendMessageStream expects an object with a `message` property.
   return chat.sendMessageStream({ message: "Begin." });
 };
 
+export const getInitialMessage = async (chat: Chat): Promise<GenerateContentResponse> => {
+  // FIX: chat.sendMessage expects an object with a `message` property.
+  return chat.sendMessage({ message: "Begin." });
+};
+
 export const sendMessageStream = async (chat: Chat, message: string) => {
+  // FIX: chat.sendMessageStream expects an object with a `message` property.
   return chat.sendMessageStream({ message });
+};
+
+export const sendMessage = async (chat: Chat, message: string): Promise<GenerateContentResponse> => {
+  // FIX: chat.sendMessage expects an object with a `message` property.
+  return chat.sendMessage({ message });
 };
 
 export const generateCharacterPortrait = async (name: string, description: string): Promise<string> => {

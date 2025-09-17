@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { UserCharacter } from '../types';
 import CharacterCreation from './CharacterCreation';
@@ -84,7 +85,7 @@ const ProfileScreen: React.FC = () => {
       {isCreating && (
         <CharacterCreation 
           onClose={() => setIsCreating(false)}
-          onCharacterCreated={handleSaveNewCharacter}
+          onSave={handleSaveNewCharacter}
         />
       )}
     </>

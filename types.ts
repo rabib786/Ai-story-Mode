@@ -1,4 +1,5 @@
 
+
 export interface ScenarioCharacter {
   name: string;
   role: string;
@@ -37,8 +38,8 @@ export interface UserCharacter {
 // A single generated response from the model, including narrative, dialogue, and actions
 export interface ModelResponsePart {
   narrative: string;
-  dialogue?: string; // The part of the narrative to highlight
   suggestedActions: string[];
+  memoryAdditions?: string[]; // Key facts from the narrative to remember
 }
 
 // A message in the chat history
@@ -58,4 +59,5 @@ export interface ActiveChat {
   scenario: Scenario;
   userCharacter: UserCharacter;
   lastUpdate: number;
+  memoryBank: string[];
 }
