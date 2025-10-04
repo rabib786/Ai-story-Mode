@@ -1,5 +1,3 @@
-
-
 export interface ScenarioCharacter {
   name: string;
   role: string;
@@ -9,11 +7,14 @@ export interface ScenarioCharacter {
 }
 
 export interface Scenario {
+  id: string;
   name:string;
   description: string;
   image?: string;
   tags: string[];
   worldDetails: string;
+  introduction?: string;
+  greetingMessage?: string;
   customInstructions: string;
   characters: ScenarioCharacter[];
   views: number;
@@ -30,6 +31,7 @@ export interface Scenario {
 }
 
 export interface UserCharacter {
+  id: string;
   name:string;
   description: string;
   portrait?: string;
@@ -40,14 +42,17 @@ export interface ModelResponsePart {
   narrative: string;
   suggestedActions: string[];
   memoryAdditions?: string[]; // Key facts from the narrative to remember
+  dominantEmotion?: string; // e.g., 'romance', 'danger', 'mystery', 'calm'
 }
 
 // A message in the chat history
 export interface ChatMessage {
-  id: string;
+  id:string;
   role: 'user' | 'model';
+  type?: 'system' | 'error'; // Used to identify UI-only messages that shouldn't be sent to the AI
   // For user roles, it's just a simple string message
   text?: string;
+  apiContent?: string; // Stores the full message sent to the API, including memory context.
   // For model roles, it contains potentially multiple generated parts for regeneration
   parts?: ModelResponsePart[];
   currentPartIndex: number;

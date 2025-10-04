@@ -1,7 +1,8 @@
 
+
 import React from 'react';
 import { ActiveChat } from '../types';
-import { Trash2Icon } from './icons';
+import { Trash2Icon, UserIcon } from './icons';
 
 interface ChatsScreenProps {
   chats: ActiveChat[];
@@ -25,64 +26,78 @@ const timeSince = (date: number): string => {
   return "Just now";
 };
 
+const ChatCard = React.memo(({ chat, onResumeChat, onDeleteChat }: { chat: ActiveChat, onResumeChat: (chat: ActiveChat) => void, onDeleteChat: (chatId: string) => void }) => (
+    <div
+      onClick={() => onResumeChat(chat)}
+      className="bg-zinc-950 rounded-lg border border-zinc-800 flex flex-col group relative overflow-hidden transform transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-sky-900/10 hover:border-sky-800/50 cursor-pointer"
+    >
+        <div className="relative h-24">
+            <img 
+              src={chat.scenario.image || `https://source.unsplash.com/random/400x200?${chat.scenario.tags[0]}`} 
+              alt={chat.scenario.name}
+              className="w-full h-full object-cover"
+              loading="lazy"
+              crossOrigin="anonymous" referrerPolicy="no-referrer"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+        </div>
+        <div className="relative p-4 pt-14 flex flex-col flex-grow">
+            <div className="absolute left-4 -top-10">
+              {chat.userCharacter.portrait ? (
+                  <img src={chat.userCharacter.portrait} alt={chat.userCharacter.name} className="w-20 h-20 rounded-md object-cover border-4 border-zinc-950" loading="lazy" crossOrigin="anonymous" referrerPolicy="no-referrer" />
+              ) : (
+                  <div className="w-20 h-20 rounded-md bg-black flex items-center justify-center border-4 border-zinc-950"><UserIcon className="w-10 h-10 text-zinc-700" /></div>
+              )}
+            </div>
+
+            <h3 className="text-lg font-bold text-cyan-400 line-clamp-1" title={chat.scenario.name}>
+                {chat.scenario.name}
+            </h3>
+            <p className="text-sm text-slate-400 truncate">
+                as {chat.userCharacter.name}
+            </p>
+            <p className="text-xs text-slate-500 mt-auto pt-4">
+                Last played: {timeSince(chat.lastUpdate)}
+            </p>
+        </div>
+
+        <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeleteChat(chat.id);
+            }}
+            title="Delete chat"
+            className="absolute top-2 right-2 p-1.5 text-slate-400 bg-black/50 hover:text-red-400 transition-all rounded-full opacity-0 group-hover:opacity-100 z-10"
+        >
+            <Trash2Icon className="w-4 h-4" />
+        </button>
+    </div>
+));
+
 
 const ChatsScreen: React.FC<ChatsScreenProps> = ({ chats, onResumeChat, onDeleteChat }) => {
   return (
-    <div className="w-full max-w-5xl mx-auto animate-fade-in">
+    <div className="w-full max-w-5xl mx-auto">
       <div className="text-center mb-8">
-        <h1 className="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-sky-400">
+        <h1 className="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-sky-500">
           Ongoing Chats
         </h1>
-        <p className="text-slate-400 mt-2">Resume one of your active adventures.</p>
+        <p className="text-slate-400 mt-2">Pick up an adventure right where you left off.</p>
       </div>
 
       {chats.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {chats.map((chat) => (
-            <div key={chat.id} className="bg-slate-800 rounded-lg border border-slate-700 flex flex-col group relative">
-              <div className="p-4">
-                <div className="flex items-start gap-4">
-                  <img
-                    src={chat.userCharacter.portrait}
-                    alt={chat.userCharacter.name}
-                    className="w-16 h-16 rounded-md object-cover flex-shrink-0 border-2 border-slate-600"
-                  />
-                  <div>
-                    <h3 className="text-lg font-bold text-purple-400 line-clamp-1" title={chat.scenario.name}>
-                      {chat.scenario.name}
-                    </h3>
-                    <p className="text-sm text-slate-300">
-                      as {chat.userCharacter.name}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Last played: {timeSince(chat.lastUpdate)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-auto p-4 border-t border-slate-700/50">
-                 <button
-                    onClick={() => onResumeChat(chat)}
-                    className="w-full text-center font-semibold text-white bg-sky-600 hover:bg-sky-500 rounded-md py-2 transition-colors"
-                  >
-                    Resume Adventure
-                  </button>
-              </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation(); // Prevent card click
-                  onDeleteChat(chat.id);
-                }}
-                title="Delete chat"
-                className="absolute top-2 right-2 p-1.5 text-slate-400 bg-slate-800/50 hover:text-red-400 transition-all rounded-full"
-              >
-                <Trash2Icon className="w-4 h-4" />
-              </button>
-            </div>
+            <ChatCard
+                key={chat.id}
+                chat={chat}
+                onResumeChat={onResumeChat}
+                onDeleteChat={onDeleteChat}
+            />
           ))}
         </div>
       ) : (
-        <div className="text-center py-16 px-6 bg-slate-800/50 rounded-lg border-2 border-dashed border-slate-700">
+        <div className="text-center py-16 px-6 bg-zinc-950/50 rounded-lg border-2 border-dashed border-zinc-800">
             <h3 className="text-xl font-bold text-slate-400">No Active Chats</h3>
             <p className="text-slate-500 mt-2">Start a new adventure from the Home screen to see it here.</p>
         </div>

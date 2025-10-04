@@ -1,32 +1,236 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="UTF--8" />
+    <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Story Mode AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
     <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        background: linear-gradient(-45deg, #000000, #0a0a0a, #111111, #000000);
+	      background-size: 400% 400%;
+	      animation: background-pan 15s ease infinite;
+      }
+      ::selection {
+        background-color: #0891b2; /* cyan-600 */
+        color: #f1f5f9; /* slate-100 */
+      }
       /* Simple scrollbar styling for a more modern look */
       ::-webkit-scrollbar {
         width: 8px;
       }
       ::-webkit-scrollbar-track {
-        background: #1e293b; /* slate-800 */
+        background: #000; /* oled black */
       }
       ::-webkit-scrollbar-thumb {
-        background: #475569; /* slate-600 */
+        background: #27272a; /* zinc-800 */
         border-radius: 4px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #64748b; /* slate-500 */
+        background: #3f3f46; /* zinc-700 */
+      }
+      @keyframes background-pan {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
       }
       @keyframes slide-in-right {
-        from { transform: translateX(100%); }
-        to { transform: translateX(0); }
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
       }
       .animate-slide-in-right {
-        animation: slide-in-right 0.3s ease-out forwards;
+        animation: slide-in-right 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+      }
+      @keyframes fade-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      .animate-fade-in {
+        animation: fade-in 0.5s ease-out forwards;
+      }
+      @keyframes fade-in-scale {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      .animate-fade-in-scale {
+        animation: fade-in-scale 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+      }
+       @keyframes slide-in-up {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-slide-in-up {
+        animation: slide-in-up 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+      }
+       @keyframes slide-in-down {
+        from { opacity: 0; transform: translateY(-15px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-slide-in-down {
+        animation: slide-in-down 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+      }
+      @keyframes text-gradient-pan {
+        from { background-position: 0% center; }
+        to { background-position: -200% center; }
+      }
+      .animate-text-shimmer {
+        animation: text-gradient-pan 5s linear infinite;
+      }
+       @keyframes shimmer-bg {
+        0%{background-position:-1000px 0}
+        100%{background-position:1000px 0}
+      }
+      .animate-shimmer {
+        background: linear-gradient(to right, #000 8%, #18181b 18%, #000 33%);
+        background-size: 2000px 100%;
+        animation: shimmer-bg 2s linear infinite;
+      }
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
+      }
+      @keyframes dot-pulse {
+        0%, 100% { opacity: 0.5; }
+        50% { opacity: 1; }
+      }
+      .animate-dot-pulse {
+        animation: dot-pulse 1.5s infinite ease-in-out;
+      }
+      
+      /* --- DYNAMIC BACKGROUND STYLES --- */
+      .dynamic-background {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: -1;
+        transition: opacity 1.5s ease-in-out;
+        overflow: hidden; /* Contain pseudo-elements */
+      }
+      .dynamic-background::before,
+      .dynamic-background::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: -1;
+      }
+
+      /* --- THEMES --- */
+      .theme-romance {
+        background: linear-gradient(-45deg, #4c1d95, #831843, #581c87);
+        background-size: 400% 400%;
+        animation: background-pan 25s ease infinite;
+      }
+      .theme-romance::before {
+        background: radial-gradient(circle at 20% 80%, rgba(255, 105, 180, 0.3), transparent 40%),
+                    radial-gradient(circle at 80% 30%, rgba(168, 85, 247, 0.3), transparent 40%);
+        animation: pulse-glow 10s infinite ease-in-out;
+      }
+
+      .theme-danger {
+        background: linear-gradient(-45deg, #000, #3f0000, #111, #450a0a);
+        background-size: 400% 400%;
+        animation: background-pan 12s ease infinite;
+      }
+      .theme-danger::before {
+        background: radial-gradient(circle, rgba(255, 0, 0, 0.5) 0%, transparent 70%);
+        animation: pulse-red-glow 3s infinite ease-in-out;
+        opacity: 0.6;
+      }
+      .theme-danger::after {
+        background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 50%);
+      }
+
+      .theme-mystery {
+        background: linear-gradient(135deg, #0f172a, #1e293b, #0c1529);
+        background-size: 400% 400%;
+        animation: background-pan 35s ease infinite;
+      }
+      .theme-mystery::before {
+        background: linear-gradient(90deg, rgba(30, 41, 59, 0) 0%, rgba(51, 65, 85, 0.2) 50%, rgba(30, 41, 59, 0) 100%);
+        animation: drift-fog 15s linear infinite alternate;
+      }
+      .theme-mystery::after {
+        background: radial-gradient(circle at 100% 100%, #3730a3, transparent 40%);
+        opacity: 0.3;
+        animation: move-spotlight 20s linear infinite alternate;
+      }
+
+      .theme-calm {
+        background: linear-gradient(-45deg, #047857, #06b6d4, #0ea5e9, #3b82f6);
+        background-size: 400% 400%;
+        animation: background-pan 40s ease infinite;
+      }
+      .theme-calm::before {
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 60%);
+        transform: scale(3);
+        animation: breathe 12s infinite ease-in-out;
+      }
+
+      .theme-joy {
+        background: linear-gradient(-45deg, #f59e0b, #fbbf24, #fcd34d, #fde68a);
+        background-size: 400% 400%;
+        animation: background-pan 18s ease infinite;
+      }
+      .theme-joy::before {
+        background:
+          radial-gradient(circle at 10% 20%, white, transparent 1%),
+          radial-gradient(circle at 50% 30%, white, transparent 1%),
+          radial-gradient(circle at 90% 40%, white, transparent 1%),
+          radial-gradient(circle at 30% 70%, white, transparent 1%),
+          radial-gradient(circle at 70% 80%, white, transparent 1%);
+        background-size: 2px 2px;
+        background-repeat: no-repeat;
+        animation: sparkle 5s linear infinite;
+        opacity: 0;
+      }
+
+      /* --- NEW ANIMATIONS --- */
+      @keyframes pulse-glow {
+        0%, 100% { transform: scale(1); opacity: 0.3; }
+        50% { transform: scale(1.2); opacity: 0.5; }
+      }
+
+      @keyframes pulse-red-glow {
+        0% { transform: scale(1); opacity: 0.4; filter: brightness(0.8); }
+        50% { transform: scale(1.1); opacity: 0.7; filter: brightness(1.2); }
+        100% { transform: scale(1); opacity: 0.4; filter: brightness(0.8); }
+      }
+
+      @keyframes drift-fog {
+        from { transform: translateX(-50%) skewX(-20deg); }
+        to { transform: translateX(50%) skewX(-20deg); }
+      }
+
+      @keyframes move-spotlight {
+        0% { transform: translate(-20%, -20%) scale(1.5); opacity: 0.2; }
+        50% { transform: translate(20%, 20%) scale(1.8); opacity: 0.4; }
+        100% { transform: translate(-20%, -20%) scale(1.5); opacity: 0.2; }
+      }
+
+      @keyframes breathe {
+        0%, 100% { opacity: 0.1; transform: scale(2.8); }
+        50% { opacity: 0.2; transform: scale(3.2); }
+      }
+
+      @keyframes sparkle {
+        0% { background-position: 10% 20%, 50% 30%, 90% 40%, 30% 70%, 70% 80%; opacity: 0; }
+        25% { opacity: 0.7; }
+        50% { background-position: 15% 25%, 55% 35%, 85% 45%, 35% 75%, 75% 85%; }
+        75% { opacity: 0.7; }
+        100% { background-position: 10% 20%, 50% 30%, 90% 40%, 30% 70%, 70% 80%; opacity: 0; }
       }
     </style>
   <script type="importmap">
@@ -40,7 +244,7 @@
 }
 </script>
 </head>
-  <body class="bg-slate-900 text-slate-100">
+  <body class="text-slate-100">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>
