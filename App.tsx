@@ -34,6 +34,8 @@ interface AlertState {
   message: string;
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const Header: React.FC<HeaderProps> = ({ onProfileClick }) => (
   <header className="fixed top-0 left-0 right-0 h-16 bg-black/80 backdrop-blur-lg border-b border-zinc-800 z-40 flex items-center justify-between px-4 sm:px-6">
     <h1 className="flex items-center gap-2 text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-sky-500">
@@ -65,8 +67,6 @@ const App: React.FC = () => {
   const showAlert = (title: string, message: string) => setAlert({ title, message });
   
   useEffect(() => {
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    
     // ONE-TIME MIGRATION to separate custom scenarios from the old mixed storage
     const savedScenariosRaw = localStorage.getItem(SCENARIOS_KEY);
     if (savedScenariosRaw) {
@@ -90,11 +90,19 @@ const App: React.FC = () => {
         
         // BUG FIX: Use robust UUID check for migrating custom scenario IDs
         const migratedCustomScenarios = customScenarios.map(s => {
-          if (!s.id || !s.id.startsWith('custom-') || !uuidRegex.test(s.id.replace('custom-', ''))) {
+          const currentId = String(s.id || '');
+          if (currentId.startsWith('custom-')) {
+            const uuidPart = currentId.replace('custom-', '');
+            if (UUID_REGEX.test(uuidPart)) {
+              return s;
+            }
+          } else if (UUID_REGEX.test(currentId)) {
             wasUpdated = true;
-            return { ...s, id: `custom-${crypto.randomUUID()}` };
+            return { ...s, id: `custom-${currentId}` };
           }
-          return s;
+
+          wasUpdated = true;
+          return { ...s, id: `custom-${crypto.randomUUID()}` };
         });
         if (wasUpdated) {
           localStorage.setItem(SCENARIOS_KEY, JSON.stringify(migratedCustomScenarios));
@@ -130,7 +138,7 @@ const App: React.FC = () => {
         let characters: UserCharacter[] = JSON.parse(savedCharactersRaw);
         let wasUpdated = false;
         characters = characters.map(c => {
-            if (!c.id || !uuidRegex.test(c.id)) {
+            if (!c.id || !UUID_REGEX.test(c.id)) {
                 wasUpdated = true;
                 return { ...c, id: crypto.randomUUID() };
             }
