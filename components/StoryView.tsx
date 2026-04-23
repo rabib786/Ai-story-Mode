@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ChatMessage, ActiveChat, ModelResponsePart, UserCharacter, Scenario, ApiSettings } from '../types';
 import { generateStoryPart } from '../services/geminiService';
+import { parseApiResponse, parseNarrative } from '../services/storyUtils';
 import { type GenerateContentResponse } from '@google/genai';
 import { SendIcon, ArrowLeftIcon, RefreshCwIcon, SettingsIcon, EyeIcon, StarIcon, ChevronLeftIcon, ChevronRightIcon, LightbulbIcon, UserIcon, Volume2Icon, StopCircleIcon, ChevronsRightIcon, Trash2Icon, Undo2Icon, MoreHorizontalIcon } from './icons';
 import { CHAT_HISTORY_PREFIX, API_SETTINGS_KEY } from '../constants/storageKeys';
@@ -44,37 +45,6 @@ interface ConfirmationState {
 const emptyPart: ModelResponsePart = { narrative: '', suggestedActions: [] };
 const errorNarrative = `<i class="text-red-400 text-center block w-full">Sorry, the AI failed to respond. Please try regenerating or rewinding.</i>`;
 
-// Safely parse the narrative to separate plain text from dialogue content.
-// This prevents HTML injection from dialogue content.
-const parseNarrative = (narrative: string): Array<{type: 'text' | 'dialogue', content: string}> => {
-  if (!narrative) return [];
-  const parts: Array<{type: 'text' | 'dialogue', content: string}> = [];
-  let lastIndex = 0;
-  const regex = /<dialogue>(.*?)<\/dialogue>/gs; // s flag for multiline
-  let match;
-
-  while ((match = regex.exec(narrative)) !== null) {
-    // Text before the dialogue
-    if (match.index > lastIndex) {
-      parts.push({ type: 'text', content: narrative.substring(lastIndex, match.index) });
-    }
-    // The dialogue content itself
-    parts.push({ type: 'dialogue', content: match[1] });
-    lastIndex = regex.lastIndex;
-  }
-
-  // Any remaining text after the last dialogue
-  if (lastIndex < narrative.length) {
-    parts.push({ type: 'text', content: narrative.substring(lastIndex) });
-  }
-  
-  // If no matches were found, the whole thing is text
-  if (parts.length === 0 && narrative.length > 0) {
-      parts.push({ type: 'text', content: narrative });
-  }
-
-  return parts;
-};
 
 
 const UserMessageBubble = React.memo(({
@@ -289,32 +259,6 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
     prevUserCharacterRef.current = chat.userCharacter;
   }, [settings, chat.userCharacter]);
 
-  const parseApiResponse = (response: GenerateContentResponse): ModelResponsePart | null => {
-    try {
-      // The .text accessor is a convenience property. If it's undefined, the response was likely empty or blocked by safety filters.
-      const jsonText = response.text;
-      
-      if (!jsonText) {
-          // Log the entire response object to help debug why the text is missing (e.g., safety ratings).
-          console.error("AI response text is empty or undefined. Full response:", JSON.stringify(response, null, 2));
-          throw new Error("Empty or invalid response from AI. The request may have been blocked by safety filters.");
-      }
-      
-      const data = JSON.parse(jsonText);
-      
-      const newPart: ModelResponsePart = {
-        narrative: data.narrative || '',
-        suggestedActions: data.suggested_actions || [],
-        memoryAdditions: data.memory_additions || [],
-        dominantEmotion: data.dominant_emotion || 'neutral',
-      };
-      
-      return newPart;
-    } catch (e) {
-      console.error("Failed to parse model JSON response. Full response object:", response, "Error:", e);
-      return null;
-    }
-  };
   
   const handleApiError = (messageId: string, error?: any) => {
      if (error) console.error("API Error:", error);
