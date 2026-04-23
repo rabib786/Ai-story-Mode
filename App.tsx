@@ -72,8 +72,9 @@ const App: React.FC = () => {
     if (savedScenariosRaw) {
         try {
             const allScenarios: Scenario[] = JSON.parse(savedScenariosRaw);
-            if (allScenarios.some(s => PREBUILT_SCENARIOS.some(ps => ps.id === s.id))) {
-                const customScenarios = allScenarios.filter(s => !PREBUILT_SCENARIOS.some(ps => ps.id === s.id));
+            const prebuiltIds = new Set(PREBUILT_SCENARIOS.map(ps => ps.id));
+            if (allScenarios.some(s => prebuiltIds.has(s.id))) {
+                const customScenarios = allScenarios.filter(s => !prebuiltIds.has(s.id));
                 localStorage.setItem(SCENARIOS_KEY, JSON.stringify(customScenarios));
             }
         } catch (e) {
