@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Story Mode AI</string>
+    <string name="title_activity_main">Story Mode AI</string>
+    <string name="package_name">com.storymodeai.app</string>
+    <string name="custom_url_scheme">com.storymodeai.app</string>
+</resources>
