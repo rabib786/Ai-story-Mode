@@ -66,3 +66,14 @@ export interface ActiveChat {
   lastUpdate: number;
   memoryBank: string[];
 }
+
+export type ApiProvider = 'gemini' | 'openai-compatible';
+
+export interface ApiSettings {
+  provider: ApiProvider;
+  geminiApiKey: string;
+  geminiModel: string;
+  openAiCompatibleApiKey: string;
+  openAiCompatibleBaseUrl: string;
+  openAiCompatibleModel: string;
+}
