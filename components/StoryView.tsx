@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ChatMessage, ActiveChat, ModelResponsePart, UserCharacter, Scenario } from '../types';
+import { ChatMessage, ActiveChat, ModelResponsePart, UserCharacter, Scenario, ApiSettings } from '../types';
 import { generateStoryPart } from '../services/geminiService';
 import { type GenerateContentResponse } from '@google/genai';
 import { SendIcon, ArrowLeftIcon, RefreshCwIcon, SettingsIcon, EyeIcon, StarIcon, ChevronLeftIcon, ChevronRightIcon, LightbulbIcon, UserIcon, Volume2Icon, StopCircleIcon, ChevronsRightIcon, Trash2Icon, Undo2Icon, MoreHorizontalIcon } from './icons';
-import { CHAT_HISTORY_PREFIX } from '../constants/storageKeys';
+import { CHAT_HISTORY_PREFIX, API_SETTINGS_KEY } from '../constants/storageKeys';
 import StorySettingsModal from './StorySettingsModal';
 import CharacterCreation from './CharacterCreation';
 import MemoryBankModal from './MemoryBankModal';
@@ -25,6 +25,15 @@ interface StorySettings {
   model: string;
   enableTTS: boolean;
 }
+
+const defaultApiSettings: ApiSettings = {
+  provider: 'gemini',
+  geminiApiKey: '',
+  geminiModel: 'gemini-2.5-flash',
+  openAiCompatibleApiKey: '',
+  openAiCompatibleBaseUrl: 'https://api.openai.com/v1',
+  openAiCompatibleModel: 'gpt-4o-mini',
+};
 
 interface ConfirmationState {
   title: string;
@@ -217,6 +226,15 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
     model: 'gemini-2.5-flash',
     enableTTS: false,
   });
+  const [apiSettings, setApiSettings] = useState<ApiSettings>(() => {
+    try {
+      const raw = localStorage.getItem(API_SETTINGS_KEY);
+      return raw ? { ...defaultApiSettings, ...JSON.parse(raw) } : defaultApiSettings;
+    } catch (error) {
+      console.error("Failed to parse API settings:", error);
+      return defaultApiSettings;
+    }
+  });
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<ConfirmationState | null>(null);
   const [dominantEmotion, setDominantEmotion] = useState<string | null>(null);
@@ -355,7 +373,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
         setChatHistory([{ id: messageId, role: 'model', parts: [emptyPart], currentPartIndex: 0 }]);
         
         try {
-          const response = await generateStoryPart(chat.scenario, chat.userCharacter, [], chat.memoryBank, "Begin the story.", settings);
+          const response = await generateStoryPart(chat.scenario, chat.userCharacter, [], chat.memoryBank, "Begin the story.", { ...settings, apiSettings });
           const finalPart = parseApiResponse(response);
 
           if (finalPart) {
@@ -379,7 +397,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
         }
       }
     }
-  }, [chat.id, chat.scenario, chat.userCharacter, recalculateMemoryBankFromHistory, settings]); 
+  }, [chat.id, chat.scenario, chat.userCharacter, recalculateMemoryBankFromHistory, settings, apiSettings]); 
   
   useEffect(() => {
     initializeStory();
@@ -465,7 +483,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
     setChatHistory([...newHistory, modelMessagePlaceholder]);
 
     try {
-      const response = await generateStoryPart(chat.scenario, chat.userCharacter, newHistory, memoryBank, textToSend, settings);
+      const response = await generateStoryPart(chat.scenario, chat.userCharacter, newHistory, memoryBank, textToSend, { ...settings, apiSettings });
       const finalPart = parseApiResponse(response);
       
       if (finalPart) {
@@ -523,7 +541,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
     try {
         const historyForRegen = chatHistory.slice(0, userMessageIndex);
         const memoryForRegen = recalculateMemoryBankFromHistory(historyForRegen);
-        const response = await generateStoryPart(chat.scenario, chat.userCharacter, historyForRegen, memoryForRegen, userMessage.text!, settings);
+        const response = await generateStoryPart(chat.scenario, chat.userCharacter, historyForRegen, memoryForRegen, userMessage.text!, { ...settings, apiSettings });
         const newPart = parseApiResponse(response);
 
         if (newPart) {
@@ -574,7 +592,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
     setChatHistory(prev => [...prev, modelMessagePlaceholder]);
 
     try {
-      const response = await generateStoryPart(chat.scenario, chat.userCharacter, chatHistory, memoryBank, continueInstruction, settings);
+      const response = await generateStoryPart(chat.scenario, chat.userCharacter, chatHistory, memoryBank, continueInstruction, { ...settings, apiSettings });
       const finalPart = parseApiResponse(response);
       
       if (finalPart) {
@@ -681,6 +699,14 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
 
   const handleSettingsChange = (field: keyof StorySettings, value: any) => {
     setSettings(prev => ({...prev, [field]: value}));
+  };
+
+  const handleApiSettingsChange = (field: keyof ApiSettings, value: ApiSettings[keyof ApiSettings]) => {
+    setApiSettings(prev => {
+      const updated = { ...prev, [field]: value };
+      localStorage.setItem(API_SETTINGS_KEY, JSON.stringify(updated));
+      return updated;
+    });
   };
   
   const lastModelMessage = chatHistory.slice().reverse().find(m => m.role === 'model' && m.type !== 'system');
@@ -792,6 +818,8 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
         onClose={() => setSettingsModalOpen(false)} 
         settings={settings} 
         onSettingsChange={handleSettingsChange} 
+        apiSettings={apiSettings}
+        onApiSettingsChange={handleApiSettingsChange}
         onEditCharacter={() => { setSettingsModalOpen(false); setCharacterModalOpen(true); }} 
         onViewMemoryBank={() => { setSettingsModalOpen(false); setMemoryBankModalOpen(true); }} 
       />}

@@ -1,7 +1,5 @@
 import { GoogleGenAI, GenerateContentResponse, Content, Type, HarmCategory, HarmBlockThreshold } from "@google/genai";
-import { Scenario, ChatMessage, UserCharacter, ModelResponsePart } from '../types';
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+import { Scenario, ChatMessage, UserCharacter, ModelResponsePart, ApiSettings } from '../types';
 
 const responseSchema = {
   type: Type.OBJECT,
@@ -139,7 +137,7 @@ export async function generateStoryPart(
     history: ChatMessage[],
     memoryBank: string[],
     userMessage: string,
-    settings: { responseLength: 'Long' | 'Medium' | 'Short', customInstructions: string, model: string }
+    settings: { responseLength: 'Long' | 'Medium' | 'Short', customInstructions: string, model: string, apiSettings: ApiSettings }
 ): Promise<GenerateContentResponse> {
     const systemInstruction = buildSystemInstruction(scenario, userCharacter, memoryBank, settings);
     const geminiHistory = formatHistoryForGemini(history);
@@ -173,17 +171,79 @@ export async function generateStoryPart(
         },
     ];
 
+    if (settings.apiSettings.provider === 'openai-compatible') {
+        return generateWithOpenAiCompatible(systemInstruction, contents, settings);
+    }
+
+    const apiKey = settings.apiSettings.geminiApiKey || process.env.GEMINI_API_KEY || process.env.API_KEY;
+    if (!apiKey) {
+        throw new Error('Gemini API key is missing. Add it in Settings > API Configuration.');
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+
     return ai.models.generateContent({
-        model: settings.model || 'gemini-2.5-flash',
-        contents: contents,
-        config: {
-            systemInstruction: systemInstruction,
-            responseMimeType: "application/json",
-            responseSchema: responseSchema,
-            ...generationConfig
-        },
-        safetySettings: safetySettings,
+      model: settings.apiSettings.geminiModel || settings.model || 'gemini-2.5-flash',
+      contents: contents,
+      config: {
+          systemInstruction: systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema: responseSchema,
+          ...generationConfig
+      },
+      safetySettings: safetySettings,
     });
+}
+
+async function generateWithOpenAiCompatible(
+  systemInstruction: string,
+  contents: Content[],
+  settings: { apiSettings: ApiSettings }
+): Promise<GenerateContentResponse> {
+  const apiKey = settings.apiSettings.openAiCompatibleApiKey.trim();
+  const baseUrl = settings.apiSettings.openAiCompatibleBaseUrl.trim().replace(/\/+$/, '');
+  const model = settings.apiSettings.openAiCompatibleModel.trim();
+
+  if (!apiKey || !baseUrl || !model) {
+    throw new Error('OpenAI-compatible settings are incomplete. Please provide Base URL, API key, and model.');
+  }
+
+  const messages = [
+    { role: 'system', content: systemInstruction },
+    ...contents.map(content => ({
+      role: content.role,
+      content: content.parts?.map(part => part.text || '').join('\n') || '',
+    })),
+  ];
+
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature: 0.9,
+      response_format: {
+        type: 'json_object',
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`OpenAI-compatible request failed (${response.status}): ${errorText}`);
+  }
+
+  const data = await response.json();
+  const text = data?.choices?.[0]?.message?.content;
+  if (!text) {
+    throw new Error('OpenAI-compatible API returned an empty response.');
+  }
+
+  return { text } as GenerateContentResponse;
 }
 
 
@@ -211,6 +271,11 @@ export async function generateCharacterPortrait(name: string, description: strin
     ];
 
     try {
+        const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+        if (!apiKey) {
+            throw new Error("Gemini API key is missing.");
+        }
+        const ai = new GoogleGenAI({ apiKey });
         const response = await ai.models.generateImages({
             model: 'imagen-4.0-generate-001',
             prompt: prompt,

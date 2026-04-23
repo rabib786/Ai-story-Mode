@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { XIcon, ChevronRightIcon, ArrowLeftIcon } from './icons';
+import { ApiSettings } from '../types';
 
 type ResponseLength = 'Long' | 'Medium' | 'Short';
 
@@ -17,6 +18,8 @@ interface StorySettingsModalProps {
   onClose: () => void;
   settings: StorySettings;
   onSettingsChange: (field: keyof StorySettings, value: any) => void;
+  apiSettings: ApiSettings;
+  onApiSettingsChange: (field: keyof ApiSettings, value: ApiSettings[keyof ApiSettings]) => void;
   onEditCharacter: () => void;
   onViewMemoryBank: () => void;
 }
@@ -40,7 +43,7 @@ const ToggleSwitch: React.FC<{ enabled: boolean; onChange: (enabled: boolean) =>
 );
 
 
-const StorySettingsModal: React.FC<StorySettingsModalProps> = ({ onClose, settings, onSettingsChange, onEditCharacter, onViewMemoryBank }) => {
+const StorySettingsModal: React.FC<StorySettingsModalProps> = ({ onClose, settings, onSettingsChange, apiSettings, onApiSettingsChange, onEditCharacter, onViewMemoryBank }) => {
 
   const handleCustomInstructionsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     if (e.target.value.length <= 300) {
@@ -83,15 +86,93 @@ const StorySettingsModal: React.FC<StorySettingsModalProps> = ({ onClose, settin
           <SettingsSection title="LLM Model Selection">
             <div className="bg-zinc-950 rounded-lg p-1">
               <select
-                value={settings.model}
-                onChange={(e) => onSettingsChange('model', e.target.value)}
+                value={apiSettings.provider === 'gemini' ? apiSettings.geminiModel : apiSettings.openAiCompatibleModel}
+                onChange={(e) => {
+                  if (apiSettings.provider === 'gemini') {
+                    onApiSettingsChange('geminiModel', e.target.value);
+                    onSettingsChange('model', e.target.value);
+                  } else {
+                    onApiSettingsChange('openAiCompatibleModel', e.target.value);
+                    onSettingsChange('model', e.target.value);
+                  }
+                }}
                 className="w-full bg-zinc-950 border-none rounded-md p-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors text-white appearance-none"
                 style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em' }}
                 aria-label="Select Large Language Model"
               >
-                <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                {/* Add other models here when available */}
+                {apiSettings.provider === 'gemini' ? (
+                  <>
+                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                    <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                  </>
+                ) : (
+                  <>
+                    <option value={apiSettings.openAiCompatibleModel}>{apiSettings.openAiCompatibleModel}</option>
+                  </>
+                )}
               </select>
+            </div>
+          </SettingsSection>
+
+          <SettingsSection title="API Configuration">
+            <div className="bg-zinc-950 rounded-lg p-3 space-y-3">
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">Provider</label>
+                <select
+                  value={apiSettings.provider}
+                  onChange={(e) => onApiSettingsChange('provider', e.target.value as ApiSettings['provider'])}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-md p-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors text-white"
+                >
+                  <option value="gemini">Gemini API</option>
+                  <option value="openai-compatible">Custom / OpenAI-Compatible</option>
+                </select>
+              </div>
+
+              {apiSettings.provider === 'gemini' ? (
+                <div>
+                  <label className="text-xs text-slate-400 mb-1 block">Gemini API Key</label>
+                  <input
+                    type="password"
+                    value={apiSettings.geminiApiKey}
+                    onChange={(e) => onApiSettingsChange('geminiApiKey', e.target.value)}
+                    placeholder="Leave blank to use .env key"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-md p-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors"
+                  />
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="text-xs text-slate-400 mb-1 block">Base URL</label>
+                    <input
+                      type="text"
+                      value={apiSettings.openAiCompatibleBaseUrl}
+                      onChange={(e) => onApiSettingsChange('openAiCompatibleBaseUrl', e.target.value)}
+                      placeholder="https://api.openai.com/v1"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-md p-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 mb-1 block">API Key</label>
+                    <input
+                      type="password"
+                      value={apiSettings.openAiCompatibleApiKey}
+                      onChange={(e) => onApiSettingsChange('openAiCompatibleApiKey', e.target.value)}
+                      placeholder="sk-..."
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-md p-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 mb-1 block">Model</label>
+                    <input
+                      type="text"
+                      value={apiSettings.openAiCompatibleModel}
+                      onChange={(e) => onApiSettingsChange('openAiCompatibleModel', e.target.value)}
+                      placeholder="gpt-4o-mini"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-md p-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors"
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </SettingsSection>
 
