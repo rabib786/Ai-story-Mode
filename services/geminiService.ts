@@ -149,9 +149,8 @@ export async function generateStoryPart(
 
     const generationConfig = {
         maxOutputTokens: 2048,
-        thinkingConfig: { thinkingBudget: 1024 },
     };
-    
+
     const safetySettings = [
         {
             category: HarmCategory.HARM_CATEGORY_HARASSMENT,
