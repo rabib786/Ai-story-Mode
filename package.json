@@ -10,11 +10,14 @@
     "test": "bun test"
   },
   "dependencies": {
-    "react-dom": "^19.1.1",
+    "@capacitor/core": "^8.3.1",
+    "@google/genai": "^1.19.0",
     "react": "^19.1.1",
-    "@google/genai": "^1.19.0"
+    "react-dom": "^19.1.1"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.3.1",
+    "@capacitor/cli": "^8.3.1",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
     "typescript": "~5.8.2",
