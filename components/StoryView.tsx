@@ -42,6 +42,31 @@ interface ConfirmationState {
   onConfirm: () => void;
 }
 
+
+/**
+ * ⚡ Bolt Optimization:
+ * Custom findLastIndex utility to avoid O(N) array allocation from .slice().reverse().findIndex()
+ * Impact: Prevents unnecessary memory allocation and reduces search time for large chat histories.
+ */
+function findLastIndex<T>(arr: T[], predicate: (val: T, index: number, obj: T[]) => boolean): number {
+  for (let i = arr.length - 1; i >= 0; i--) {
+    if (predicate(arr[i], i, arr)) return i;
+  }
+  return -1;
+}
+
+/**
+ * ⚡ Bolt Optimization:
+ * Custom findLast utility to avoid O(N) array allocation from .slice().reverse().find()
+ * Impact: Prevents unnecessary memory allocation and reduces search time for large chat histories.
+ */
+function findLast<T>(arr: T[], predicate: (val: T, index: number, obj: T[]) => boolean): T | undefined {
+  for (let i = arr.length - 1; i >= 0; i--) {
+    if (predicate(arr[i], i, arr)) return arr[i];
+  }
+  return undefined;
+}
+
 const emptyPart: ModelResponsePart = { narrative: '', suggestedActions: [] };
 const errorNarrative = `<i class="text-red-400 text-center block w-full">Sorry, the AI failed to respond. Please try regenerating or rewinding.</i>`;
 
@@ -365,7 +390,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
   useEffect(() => {
     // This effect syncs the dominant emotion for the background
     // with the currently displayed model message.
-    const lastModelMessage = chatHistory.slice().reverse().find(m => m.role === 'model' && m.type !== 'system' && m.type !== 'error');
+    const lastModelMessage = findLast<ChatMessage>(chatHistory, (m) => m.role === 'model' && m.type !== 'system' && m.type !== 'error');
     if (lastModelMessage && lastModelMessage.parts && lastModelMessage.parts.length > 0) {
       const currentPart = lastModelMessage.parts[lastModelMessage.currentPartIndex];
       if (currentPart && currentPart.dominantEmotion) {
@@ -463,11 +488,10 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
   const handleRegenerate = async () => {
     if (isLoading) return;
 
-    const lastUserMessageIndex = chatHistory.slice().reverse().findIndex(m => m.role === 'user');
-    if (lastUserMessageIndex === -1) {
+    const userMessageIndex = findLastIndex<ChatMessage>(chatHistory, (m) => m.role === 'user');
+    if (userMessageIndex === -1) {
         return;
     }
-    const userMessageIndex = chatHistory.length - 1 - lastUserMessageIndex;
     const userMessage = chatHistory[userMessageIndex];
 
     const modelMessageIndex = userMessageIndex + 1;
@@ -567,10 +591,9 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
         title: "Rewind Last Action",
         message: "This will remove your last action and the AI's response. Are you sure you want to proceed?",
         onConfirm: () => {
-            const lastUserMessageIndex = chatHistory.slice().reverse().findIndex(m => m.role === 'user');
-            if (lastUserMessageIndex !== -1) {
-                const indexToRemoveFrom = chatHistory.length - 1 - lastUserMessageIndex;
-                const newHistory = chatHistory.slice(0, indexToRemoveFrom);
+            const userMessageIndex = findLastIndex<ChatMessage>(chatHistory, (m) => m.role === 'user');
+            if (userMessageIndex !== -1) {
+                const newHistory = chatHistory.slice(0, userMessageIndex);
                 setChatHistory(newHistory);
                 const newMemoryBank = recalculateMemoryBankFromHistory(newHistory);
                 setMemoryBank(newMemoryBank);
@@ -583,9 +606,8 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
   const handleDeleteLastResponse = useCallback(() => {
     if (isLoading) return;
 
-    const lastModelMessageIndex = chatHistory.slice().reverse().findIndex(m => m.role === 'model' && m.type !== 'system' && m.type !== 'error');
-    if (lastModelMessageIndex === -1) return;
-    const actualIndex = chatHistory.length - 1 - lastModelMessageIndex;
+    const actualIndex = findLastIndex<ChatMessage>(chatHistory, (m) => m.role === 'model' && m.type !== 'system' && m.type !== 'error');
+    if (actualIndex === -1) return;
 
     setConfirmation({
         title: "Delete Last Response",
@@ -653,7 +675,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
     });
   };
   
-  const lastModelMessage = chatHistory.slice().reverse().find(m => m.role === 'model' && m.type !== 'system');
+  const lastModelMessage = findLast<ChatMessage>(chatHistory, (m) => m.role === 'model' && m.type !== 'system');
   const suggestedActions = settings.showResponseSuggestions && lastModelMessage?.parts?.[lastModelMessage.currentPartIndex]?.suggestedActions || [];
 
   useEffect(() => {
