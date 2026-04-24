@@ -27,3 +27,18 @@ The app now supports two providers from **Story Settings → API Configuration**
   - Uses an in-app Gemini key, or falls back to `GEMINI_API_KEY` / `API_KEY` from `.env.local`.
 - **Custom / OpenAI-Compatible**
   - Configure Base URL, API key, and model for any OpenAI-compatible `/chat/completions` endpoint.
+
+## Build Android APK
+
+To build the Android application locally, follow these steps:
+
+1. Install dependencies using bun:
+   `bun install`
+2. Build the web application:
+   `bun run build`
+3. Sync Capacitor:
+   `bun x @capacitor/cli sync`
+4. Build the APK using Gradle:
+   `cd android && ./gradlew assembleDebug`
+
+The generated debug APK will be located at `android/app/build/outputs/apk/debug/app-debug.apk`.
