@@ -1,4 +1,5 @@
 import { GoogleGenAI, GenerateContentResponse, Content, Type, HarmCategory, HarmBlockThreshold } from "@google/genai";
+import { logger } from "./logger";
 import { Scenario, ChatMessage, UserCharacter, ModelResponsePart, ApiSettings } from '../types';
 
 const responseSchema = {
@@ -190,7 +191,7 @@ export async function generateStoryPart(
           responseSchema: responseSchema,
           ...generationConfig
       },
-      safetySettings: safetySettings,
+      config: { safetySettings: safetySettings },
     });
 }
 
@@ -283,7 +284,7 @@ export async function generateCharacterPortrait(name: string, description: strin
                 outputMimeType: 'image/jpeg',
                 aspectRatio: '1:1',
             },
-            safetySettings: safetySettings,
+            config: { safetySettings: safetySettings },
         });
 
         // The API can return an empty array if the prompt is flagged. Check for this and provide a better error.
@@ -291,11 +292,11 @@ export async function generateCharacterPortrait(name: string, description: strin
             const base64ImageBytes = response.generatedImages[0].image.imageBytes;
             return `data:image/jpeg;base64,${base64ImageBytes}`;
         } else {
-            console.error("Image generation failed, API returned no images. Response:", JSON.stringify(response, null, 2));
+            logger.error("Image generation failed, API returned no images. Response:", response);
             throw new Error("No image was generated. This might be due to safety filters. Please try rephrasing the description.");
         }
     } catch (error) {
-        console.error("Error generating character portrait:", error);
+        logger.error("Error generating character portrait:", error);
         // Propagate the more specific error message if it's one we created.
         if (error instanceof Error && error.message.startsWith("No image was generated")) {
             throw error;
