@@ -514,14 +514,15 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
 
         if (newPart) {
             setChatHistory(prev => {
-                const updatedHistory = JSON.parse(JSON.stringify(prev));
-                const messageToUpdate = updatedHistory[modelMessageIndex];
+                const updatedHistory = [...prev];
+                const messageToUpdate = { ...updatedHistory[modelMessageIndex] };
                 
                 const existingParts = messageToUpdate.parts?.filter((p: ModelResponsePart) => p.narrative || (p.suggestedActions && p.suggestedActions.length > 0)) || [];
                 const newParts = [...existingParts, newPart];
                 messageToUpdate.parts = newParts;
                 messageToUpdate.currentPartIndex = newParts.length - 1;
                 messageToUpdate.type = undefined;
+                updatedHistory[modelMessageIndex] = messageToUpdate;
 
                 const newMemoryBank = recalculateMemoryBankFromHistory(updatedHistory);
                 setMemoryBank(newMemoryBank);
