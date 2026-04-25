@@ -101,7 +101,7 @@ interface ModelMessageBubbleProps {
     isSpeaking: boolean;
     isActionable: boolean;
     hasUserMessages: boolean;
-    onChangePart: (direction: 'next' | 'prev') => void;
+    onChangePart: (messageId: string, direction: 'next' | 'prev') => void;
     onPlayTTS: (messageId: string, text: string) => void;
     enableTTS: boolean;
     onRewind: () => void;
@@ -173,9 +173,9 @@ const ModelMessageBubble = React.memo(({
                             {message.parts && message.parts.length > 1 && (
                                 <>
                                     {enableTTS && narrativeToRender && <div className="w-px h-4 bg-zinc-700 mx-1"></div>}
-                                    <button onClick={() => onChangePart('prev')} className="p-1 rounded-full hover:bg-zinc-800 text-slate-400"><ChevronLeftIcon className="w-5 h-5"/></button>
+                                    <button onClick={() => onChangePart(message.id, 'prev')} className="p-1 rounded-full hover:bg-zinc-800 text-slate-400"><ChevronLeftIcon className="w-5 h-5"/></button>
                                     <span className="text-xs text-zinc-400 w-8 text-center">{message.currentPartIndex + 1}/{message.parts.length}</span>
-                                    <button onClick={() => onChangePart('next')} className="p-1 rounded-full hover:bg-zinc-800 text-slate-400"><ChevronRightIcon className="w-5 h-5"/></button>
+                                    <button onClick={() => onChangePart(message.id, 'next')} className="p-1 rounded-full hover:bg-zinc-800 text-slate-400"><ChevronRightIcon className="w-5 h-5"/></button>
                                 </>
                             )}
                 
@@ -285,7 +285,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
   }, [settings, chat.userCharacter]);
 
   
-  const handleApiError = (messageId: string, error?: any) => {
+  const handleApiError = useCallback((messageId: string, error?: any) => {
      if (error) console.error("API Error:", error);
      setChatHistory(prev => {
         const messageIndex = prev.findIndex(m => m.id === messageId);
@@ -299,7 +299,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
         };
         return updatedHistory;
      });
-  };
+  }, []);
 
  const initializeStory = useCallback(async () => {
     setIsLoading(true);
@@ -366,7 +366,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
         }
       }
     }
-  }, [chat.id, chat.scenario, chat.userCharacter, recalculateMemoryBankFromHistory, settings, apiSettings]); 
+  }, [chat.id, chat.scenario, chat.userCharacter, recalculateMemoryBankFromHistory, settings, apiSettings, handleApiError]);
   
   useEffect(() => {
     initializeStory();
@@ -485,7 +485,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
     }
   };
 
-  const handleRegenerate = async () => {
+  const handleRegenerate = useCallback(async () => {
     if (isLoading) return;
 
     const userMessageIndex = findLastIndex<ChatMessage>(chatHistory, (m) => m.role === 'user');
@@ -545,9 +545,9 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
     } finally {
         setIsLoading(false);
     }
-  };
+  }, [isLoading, chatHistory, chat.scenario, chat.userCharacter, settings, apiSettings, recalculateMemoryBankFromHistory, handleApiError]);
 
-  const handleContinue = async () => {
+  const handleContinue = useCallback(async () => {
     if (isLoading) return;
     setIsLoading(true);
     const continueInstruction = "(SYSTEM: Continue the story from the last message. Do not write a user action. Simply continue the narrative.)";
@@ -582,7 +582,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
     } finally {
         setIsLoading(false);
     }
-  };
+  }, [isLoading, chatHistory, memoryBank, chat.scenario, chat.userCharacter, settings, apiSettings, recalculateMemoryBankFromHistory, handleApiError]);
   
   const handleRewind = useCallback(() => {
     if (isLoading) return;
@@ -689,6 +689,8 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
   const hasUserMessages = chatHistory.some(m => m.role === 'user');
   const lastActionableModelMessageIndex = chatHistory.map(m => m.role === 'model' && m.type !== 'system' && m.type !== 'error').lastIndexOf(true);
 
+  const handleEditCharacter = useCallback(() => setCharacterModalOpen(true), []);
+
   return (
     <div className="flex flex-col h-screen bg-transparent text-white w-full relative">
       <DynamicBackground emotion={dominantEmotion} />
@@ -712,7 +714,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
               key={msg.id}
               message={msg}
               character={chat.userCharacter}
-              onEditCharacter={() => setCharacterModalOpen(true)}
+              onEditCharacter={handleEditCharacter}
             />
           ) : (
             <ModelMessageBubble
@@ -722,7 +724,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
               isLoading={isLoading && index === chatHistory.length - 1}
               isSpeaking={speakingMessageId === msg.id}
               isActionable={index === lastActionableModelMessageIndex}
-              onChangePart={(dir) => handleChangePart(msg.id, dir)}
+              onChangePart={handleChangePart}
               onPlayTTS={handlePlayTTS}
               enableTTS={settings.enableTTS}
               hasUserMessages={hasUserMessages}
