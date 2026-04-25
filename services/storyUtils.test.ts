@@ -48,25 +48,40 @@ describe("storyUtils", () => {
         text: ""
       } as any;
 
-      // Silence console.error for this test
-      spyOn(console, 'error').mockImplementation(() => {});
+      // Capture and silence console.error for this test
+      const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
+      errorSpy.mockClear();
 
       const result = parseApiResponse(mockResponse);
 
       expect(result).toBeNull();
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        "AI response text is empty or undefined. Full response:",
+        '{\n  "text": ""\n}'
+      );
     });
 
     test("should return null and log error if JSON is invalid", () => {
-      const mockResponse: GenerateContentResponse = {
+      const mockResponse = {
         text: "Invalid JSON"
-      } as any;
+      } as GenerateContentResponse;
 
-      // Silence console.error for this test
-      spyOn(console, 'error').mockImplementation(() => {});
+      // Capture and silence console.error for this test
+      const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
+      errorSpy.mockClear();
 
       const result = parseApiResponse(mockResponse);
 
       expect(result).toBeNull();
+      expect(errorSpy).toHaveBeenCalled();
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        "Failed to parse model JSON response. Full response object:",
+        mockResponse,
+        "Error:",
+        expect.any(Error)
+      );
     });
   });
 
