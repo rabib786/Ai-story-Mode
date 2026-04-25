@@ -9,10 +9,10 @@ interface ScenarioSelectorProps {
   onDeleteScenario: (scenarioId: string) => void;
 }
 
-const ScenarioCard: React.FC<{ scenario: Scenario; onSelect: () => void; onDelete: () => void; }> = ({ scenario, onSelect, onDelete }) => (
+const ScenarioCard = React.memo(({ scenario, onSelect, onDelete }: { scenario: Scenario; onSelect: (scenario: Scenario) => void; onDelete: (id: string) => void; }) => (
   <div
     className="relative rounded-lg overflow-hidden border border-zinc-800 group cursor-pointer transform hover:-translate-y-1 transition-transform duration-300 hover:shadow-2xl hover:shadow-cyan-500/10 aspect-[4/3]"
-    onClick={onSelect}
+    onClick={() => onSelect(scenario)}
   >
     {scenario.image ? 
         <img src={scenario.image} alt={scenario.name} className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" crossOrigin="anonymous" referrerPolicy="no-referrer" />
@@ -50,7 +50,7 @@ const ScenarioCard: React.FC<{ scenario: Scenario; onSelect: () => void; onDelet
      <button
         onClick={(e) => {
             e.stopPropagation(); // Prevent onSelect from firing
-            onDelete();
+            onDelete(scenario.id);
         }}
         title="Delete scenario"
         className="absolute top-3 right-3 z-20 p-1.5 text-slate-200 bg-black/50 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all rounded-full hover:bg-black"
@@ -58,7 +58,7 @@ const ScenarioCard: React.FC<{ scenario: Scenario; onSelect: () => void; onDelet
         <Trash2Icon className="w-4 h-4" />
     </button>
   </div>
-);
+));
 
 const ScenarioSelector: React.FC<ScenarioSelectorProps> = ({ scenarios, onSelectScenario, onStartCreation, onDeleteScenario }) => {
   return (
@@ -74,8 +74,8 @@ const ScenarioSelector: React.FC<ScenarioSelectorProps> = ({ scenarios, onSelect
           <ScenarioCard
             key={scenario.id}
             scenario={scenario}
-            onSelect={() => onSelectScenario(scenario)}
-            onDelete={() => onDeleteScenario(scenario.id)}
+            onSelect={onSelectScenario}
+            onDelete={onDeleteScenario}
           />
         ))}
         <div
