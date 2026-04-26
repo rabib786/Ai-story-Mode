@@ -189,9 +189,9 @@ export async function generateStoryPart(
           systemInstruction: systemInstruction,
           responseMimeType: "application/json",
           responseSchema: responseSchema,
-          ...generationConfig
+          ...generationConfig,
+          safetySettings: safetySettings
       },
-      config: { safetySettings: safetySettings },
     });
 }
 
@@ -283,8 +283,8 @@ export async function generateCharacterPortrait(name: string, description: strin
                 numberOfImages: 1,
                 outputMimeType: 'image/jpeg',
                 aspectRatio: '1:1',
+                safetySettings: safetySettings
             },
-            config: { safetySettings: safetySettings },
         });
 
         // The API can return an empty array if the prompt is flagged. Check for this and provide a better error.
