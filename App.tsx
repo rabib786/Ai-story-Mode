@@ -1,6 +1,7 @@
 
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { App as CapacitorApp } from '@capacitor/app';
 import { Scenario, UserCharacter, ActiveChat } from './types';
 import ScenarioSelector from './components/ScenarioSelector';
 import StoryView from './components/StoryView';
@@ -276,6 +277,28 @@ const App: React.FC = () => {
     setScenarioForSelection(null);
     setCurrentScreen('scenario_details');
   }, [scenarioForSelection]);
+
+  useEffect(() => {
+    const backButtonListener = CapacitorApp.addListener('backButton', () => {
+      if (currentScreen === 'story_view') {
+        handleExitStory(currentChat?.memoryBank || []);
+      } else if (
+        currentScreen === 'scenario_editor' ||
+        currentScreen === 'profile' ||
+        currentScreen === 'chats_list' ||
+        currentScreen === 'scenario_details'
+      ) {
+        setCurrentScreen('scenario_selector');
+      } else if (currentScreen === 'character_selector') {
+        setCurrentScreen('scenario_details');
+      } else if (currentScreen === 'scenario_selector') {
+        CapacitorApp.minimizeApp();
+      }
+    });
+    return () => {
+      backButtonListener.then((l) => l.remove());
+    };
+  }, [currentScreen, currentChat, handleExitStory]);
 
   const handleNavigate = (view: View) => {
     setCurrentChat(null);
