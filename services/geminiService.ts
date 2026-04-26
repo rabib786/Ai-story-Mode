@@ -211,7 +211,7 @@ async function generateWithOpenAiCompatible(
   const messages = [
     { role: 'system', content: systemInstruction },
     ...contents.map(content => ({
-      role: content.role,
+      role: content.role === 'model' ? 'assistant' : content.role,
       content: content.parts?.map(part => part.text || '').join('\n') || '',
     })),
   ];

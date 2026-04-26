@@ -103,7 +103,7 @@ const StorySettingsModal: React.FC<StorySettingsModalProps> = ({ onClose, settin
                 {apiSettings.provider === 'gemini' ? (
                   <>
                     <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                    <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                    <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
                   </>
                 ) : (
                   <>
