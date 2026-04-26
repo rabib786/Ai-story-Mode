@@ -10,6 +10,7 @@ import { PREBUILT_SCENARIOS } from './constants/scenarios';
 import BottomNavBar from './components/BottomNavBar';
 import ScenarioEditor from './components/ScenarioEditor';
 import ProfileScreen from './components/ProfileScreen';
+import { logger } from './services/logger';
 import ChatsScreen from './components/ChatsScreen';
 import { ACTIVE_CHATS_KEY, SCENARIOS_KEY, CHAT_HISTORY_PREFIX, USER_CHARACTERS_KEY, DELETED_PREBUILT_SCENARIOS_KEY } from './constants/storageKeys';
 import { UserCircleIcon, BookOpenIcon } from './components/icons';
@@ -79,7 +80,7 @@ const App: React.FC = () => {
                 localStorage.setItem(SCENARIOS_KEY, JSON.stringify(customScenarios));
             }
         } catch (e) {
-            console.error("Failed to migrate scenarios, clearing for safety.", e);
+            logger.error("Failed to migrate scenarios, clearing for safety.", e);
             localStorage.removeItem(SCENARIOS_KEY);
         }
     }
@@ -116,7 +117,7 @@ const App: React.FC = () => {
         
         setScenarios([...activePrebuiltScenarios, ...migratedCustomScenarios]);
     } catch (error) {
-        console.error("Failed to load scenarios, falling back to default:", error);
+        logger.error("Failed to load scenarios, falling back to default:", error);
         setScenarios(PREBUILT_SCENARIOS);
         localStorage.removeItem(SCENARIOS_KEY);
     }
@@ -129,7 +130,7 @@ const App: React.FC = () => {
         setActiveChats(JSON.parse(savedChats));
       }
     } catch (error) {
-      console.error("Failed to load or parse active chats:", error);
+      logger.error("Failed to load or parse active chats:", error);
       setActiveChats([]);
     }
     
@@ -161,7 +162,7 @@ const App: React.FC = () => {
         localStorage.setItem(USER_CHARACTERS_KEY, JSON.stringify([defaultCharacter]));
       }
     } catch (error) {
-      console.error("Failed to load or parse user characters, falling back to default:", error);
+      logger.error("Failed to load or parse user characters, falling back to default:", error);
       const defaultCharacter: UserCharacter = {
           id: crypto.randomUUID(),
           name: "Steve",
@@ -436,7 +437,7 @@ const App: React.FC = () => {
   
   const handleUpdateUserCharacter = (chatId: string, updatedCharacter: UserCharacter) => {
     if (!updatedCharacter.id) {
-      console.error("Attempted to update a character without an ID.");
+      logger.error("Attempted to update a character without an ID.");
       return;
     }
     
