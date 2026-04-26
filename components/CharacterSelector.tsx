@@ -13,7 +13,7 @@ interface CharacterSelectorProps {
   showAlert: (title: string, message: string) => void;
 }
 
-const CharacterCard: React.FC<{ char: UserCharacter, onSelect: () => void, onDelete: () => void }> = ({ char, onSelect, onDelete }) => (
+const CharacterCard = React.memo(({ char, onSelect, onDelete }: { char: UserCharacter, onSelect: (char: UserCharacter) => void, onDelete: (id: string) => void }) => (
     <div className="bg-zinc-950 rounded-lg border border-zinc-800 flex flex-col group relative overflow-hidden transform transition-transform hover:-translate-y-1 hover:scale-[1.02]">
         {char.portrait ? (
             <img src={char.portrait} alt={char.name} className="w-full h-48 object-cover" loading="lazy" crossOrigin="anonymous" referrerPolicy="no-referrer" />
@@ -28,19 +28,19 @@ const CharacterCard: React.FC<{ char: UserCharacter, onSelect: () => void, onDel
                 {char.description || <em>No description provided.</em>}
             </p>
             <button 
-                onClick={onSelect}
+                onClick={() => onSelect(char)}
                 className="mt-4 w-full text-center font-semibold text-white bg-sky-600 hover:bg-sky-500 rounded-md py-2 transition-colors transform active:scale-95">
                 Select
             </button>
         </div>
          <button 
-            onClick={onDelete}
+            onClick={() => onDelete(char.id)}
             title="Delete character"
             className="absolute top-2 right-2 p-1.5 text-slate-200 bg-black/60 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all rounded-full hover:bg-zinc-900/80">
             <Trash2Icon className="w-4 h-4" />
         </button>
     </div>
-);
+));
 
 const CharacterSelector: React.FC<CharacterSelectorProps> = ({ characters, onSaveCharacters, onCharacterSelected, onBack, activeChats, showAlert }) => {
   const [isCreating, setIsCreating] = useState(false);
@@ -102,8 +102,8 @@ const CharacterSelector: React.FC<CharacterSelectorProps> = ({ characters, onSav
             <CharacterCard
                 key={char.id}
                 char={char}
-                onSelect={() => onCharacterSelected(char)}
-                onDelete={() => handleDeleteCharacter(char.id)}
+                onSelect={onCharacterSelected}
+                onDelete={handleDeleteCharacter}
             />
           ))}
           <div

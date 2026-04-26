@@ -11,7 +11,7 @@ interface ProfileScreenProps {
     showAlert: (title: string, message: string) => void;
 }
 
-const CharacterCard: React.FC<{ char: UserCharacter; onEdit: (char: UserCharacter) => void; onDelete: (id: string) => void; }> = ({ char, onEdit, onDelete }) => (
+const CharacterCard = React.memo(({ char, onEdit, onDelete }: { char: UserCharacter; onEdit: (char: UserCharacter) => void; onDelete: (id: string) => void; }) => (
     <div className="bg-zinc-950 rounded-lg border border-zinc-800 flex flex-col group relative overflow-hidden transform transition-transform hover:-translate-y-1 hover:scale-[1.02]">
         <div className="relative h-48 w-full">
             {char.portrait ? (
@@ -43,7 +43,7 @@ const CharacterCard: React.FC<{ char: UserCharacter; onEdit: (char: UserCharacte
             </p>
         </div>
     </div>
-);
+));
 
 
 const ProfileScreen: React.FC<ProfileScreenProps> = ({ characters, onSaveCharacters, activeChats, showAlert }) => {
@@ -52,15 +52,15 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ characters, onSaveCharact
   const [confirmation, setConfirmation] = useState<{ title: string; message: string; onConfirm: () => void; } | null>(null);
 
 
-  const handleOpenCreator = () => {
+  const handleOpenCreator = useCallback(() => {
     setEditingCharacter(null);
     setEditorOpen(true);
-  };
+  }, []);
 
-  const handleOpenEditor = (character: UserCharacter) => {
+  const handleOpenEditor = useCallback((character: UserCharacter) => {
     setEditingCharacter(character);
     setEditorOpen(true);
-  };
+  }, []);
   
   const handleSaveOrUpdateCharacter = (character: UserCharacter) => {
     // Check for name conflict (if name was changed)
