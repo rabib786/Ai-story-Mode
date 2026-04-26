@@ -1,0 +1,6 @@
+🧹 [Code Health] Replace direct console.error calls with structured logger utility in App.tsx
+
+🎯 What: Replaced direct console.error calls in App.tsx with the structured logger utility from `services/logger.ts`.
+💡 Why: Direct console.log/error statements in production code represent a lack of structured error handling. Using a centralized logger makes it easier to track errors properly and keeps error handling uniform.
+✅ Verification: Ran `bun test` and verified that the project continues to build without type checking errors. Functionality remains identically equivalent while passing proper objects to `logger.error`.
+✨ Result: Cleaned up 5 instances of `console.error`, unifying all console output tracking within the existing codebase convention.
