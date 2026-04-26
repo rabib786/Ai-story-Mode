@@ -1,21 +1,21 @@
 
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, Suspense } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Scenario, UserCharacter, ActiveChat } from './types';
-import ScenarioSelector from './components/ScenarioSelector';
-import StoryView from './components/StoryView';
-import CharacterSelector from './components/CharacterSelector';
+const ScenarioSelector = React.lazy(() => import('./components/ScenarioSelector'));
+const StoryView = React.lazy(() => import('./components/StoryView'));
+const CharacterSelector = React.lazy(() => import('./components/CharacterSelector'));
 import { PREBUILT_SCENARIOS } from './constants/scenarios';
-import BottomNavBar from './components/BottomNavBar';
-import ScenarioEditor from './components/ScenarioEditor';
-import ProfileScreen from './components/ProfileScreen';
-import ChatsScreen from './components/ChatsScreen';
+const BottomNavBar = React.lazy(() => import('./components/BottomNavBar'));
+const ScenarioEditor = React.lazy(() => import('./components/ScenarioEditor'));
+const ProfileScreen = React.lazy(() => import('./components/ProfileScreen'));
+const ChatsScreen = React.lazy(() => import('./components/ChatsScreen'));
 import { ACTIVE_CHATS_KEY, SCENARIOS_KEY, CHAT_HISTORY_PREFIX, USER_CHARACTERS_KEY, DELETED_PREBUILT_SCENARIOS_KEY } from './constants/storageKeys';
 import { UserCircleIcon, BookOpenIcon } from './components/icons';
-import ScenarioDetailView from './components/ScenarioDetailView';
-import ConfirmationModal from './components/ConfirmationModal';
-import AlertModal from './components/AlertModal';
+const ScenarioDetailView = React.lazy(() => import('./components/ScenarioDetailView'));
+const ConfirmationModal = React.lazy(() => import('./components/ConfirmationModal'));
+const AlertModal = React.lazy(() => import('./components/AlertModal'));
 
 type Screen = 'scenario_selector' | 'scenario_details' | 'character_selector' | 'story_view' | 'scenario_editor' | 'profile' | 'chats_list';
 type View = 'home' | 'create' | 'chats' | 'profile';
@@ -174,7 +174,12 @@ const App: React.FC = () => {
   
   const handleSaveCharacters = (updatedCharacters: UserCharacter[]) => {
     setUserCharacters(updatedCharacters);
-    localStorage.setItem(USER_CHARACTERS_KEY, JSON.stringify(updatedCharacters));
+    try {
+      localStorage.setItem(USER_CHARACTERS_KEY, JSON.stringify(updatedCharacters));
+    } catch (error) {
+      console.error(error);
+      showAlert("Storage Error", "Failed to save data. Please check your storage space.");
+    }
 
     // Sync character updates to any active chats using them
     const updatedActiveChats = activeChats.map(chat => {
@@ -189,7 +194,12 @@ const App: React.FC = () => {
     // Only update state and storage if there was a meaningful change
     if (JSON.stringify(updatedActiveChats) !== JSON.stringify(activeChats)) {
         setActiveChats(updatedActiveChats);
-        localStorage.setItem(ACTIVE_CHATS_KEY, JSON.stringify(updatedActiveChats));
+        try {
+          localStorage.setItem(ACTIVE_CHATS_KEY, JSON.stringify(updatedActiveChats));
+        } catch (error) {
+          console.error(error);
+          showAlert("Storage Error", "Failed to save data. Please check your storage space.");
+        }
     }
   };
 
@@ -223,10 +233,15 @@ const App: React.FC = () => {
       lastUpdate: Date.now(),
       memoryBank: [],
     };
-    
+
     const updatedChats = [newChat, ...activeChats.filter(c => c.id !== id)];
     setActiveChats(updatedChats);
-    localStorage.setItem(ACTIVE_CHATS_KEY, JSON.stringify(updatedChats));
+    try {
+      localStorage.setItem(ACTIVE_CHATS_KEY, JSON.stringify(updatedChats));
+    } catch (error) {
+      console.error(error);
+      showAlert("Storage Error", "Failed to save data. Please check your storage space.");
+    }
 
     setCurrentChat(newChat);
     setScenarioForSelection(null);
@@ -235,12 +250,17 @@ const App: React.FC = () => {
 
   const handleExitStory = useCallback((finalMemoryBank: string[]) => {
     if (currentChat) {
-      const updatedChats = activeChats.map(c => 
-        c.id === currentChat.id ? { ...c, lastUpdate: Date.now(), memoryBank: finalMemoryBank } : c
+      const updatedChats = activeChats.map(c =>
+        c.id === currentChat.id ? { ...c, lastUpdate: Date.now(), memoryBank: finalMemoryBank.slice(-50) } : c
       );
       updatedChats.sort((a, b) => b.lastUpdate - a.lastUpdate);
       setActiveChats(updatedChats);
-      localStorage.setItem(ACTIVE_CHATS_KEY, JSON.stringify(updatedChats));
+      try {
+        localStorage.setItem(ACTIVE_CHATS_KEY, JSON.stringify(updatedChats));
+      } catch (error) {
+        console.error(error);
+        showAlert("Storage Error", "Failed to save data. Please check your storage space.");
+      }
     }
     setCurrentChat(null);
     setCurrentScreen('scenario_selector');
@@ -258,8 +278,17 @@ const App: React.FC = () => {
       onConfirm: () => {
         const updatedChats = activeChats.filter(c => c.id !== chatId);
         setActiveChats(updatedChats);
-        localStorage.setItem(ACTIVE_CHATS_KEY, JSON.stringify(updatedChats));
-        localStorage.removeItem(`${CHAT_HISTORY_PREFIX}${chatId}`);
+        try {
+          localStorage.setItem(ACTIVE_CHATS_KEY, JSON.stringify(updatedChats));
+        } catch (error) {
+          console.error(error);
+          showAlert("Storage Error", "Failed to save data. Please check your storage space.");
+        }
+        try {
+          localStorage.removeItem(`${CHAT_HISTORY_PREFIX}${chatId}`);
+        } catch (error) {
+          console.error(error);
+        }
         setConfirmation(null);
       }
     });
@@ -317,7 +346,12 @@ const App: React.FC = () => {
   };
   
   const handleSaveScenario = (scenarioToSave: Scenario) => {
-    const savedCustomScenariosRaw = localStorage.getItem(SCENARIOS_KEY);
+    let savedCustomScenariosRaw = null;
+    try {
+      savedCustomScenariosRaw = localStorage.getItem(SCENARIOS_KEY);
+    } catch (error) {
+      console.error(error);
+    }
     let customScenarios: Scenario[] = savedCustomScenariosRaw ? JSON.parse(savedCustomScenariosRaw) : [];
 
     const isOriginallyPrebuilt = PREBUILT_SCENARIOS.some(s => s.id === editingScenario?.id);
@@ -360,10 +394,20 @@ const App: React.FC = () => {
             customScenarios = [scenarioToSave, ...customScenarios];
         }
     }
-    
-    localStorage.setItem(SCENARIOS_KEY, JSON.stringify(customScenarios));
-    
-    const deletedPrebuiltIdsRaw = localStorage.getItem(DELETED_PREBUILT_SCENARIOS_KEY);
+
+    try {
+      localStorage.setItem(SCENARIOS_KEY, JSON.stringify(customScenarios));
+    } catch (error) {
+      console.error(error);
+      showAlert("Storage Error", "Failed to save data. Please check your storage space.");
+    }
+
+    let deletedPrebuiltIdsRaw = null;
+    try {
+      deletedPrebuiltIdsRaw = localStorage.getItem(DELETED_PREBUILT_SCENARIOS_KEY);
+    } catch (error) {
+      console.error(error);
+    }
     const deletedPrebuiltIds: string[] = deletedPrebuiltIdsRaw ? JSON.parse(deletedPrebuiltIdsRaw) : [];
     const activePrebuiltScenarios = PREBUILT_SCENARIOS.filter(s => !deletedPrebuiltIds.includes(s.id));
     
@@ -380,7 +424,12 @@ const App: React.FC = () => {
 
     if (JSON.stringify(updatedActiveChats) !== JSON.stringify(activeChats)) {
         setActiveChats(updatedActiveChats);
-        localStorage.setItem(ACTIVE_CHATS_KEY, JSON.stringify(updatedActiveChats));
+        try {
+          localStorage.setItem(ACTIVE_CHATS_KEY, JSON.stringify(updatedActiveChats));
+        } catch (error) {
+          console.error(error);
+          showAlert("Storage Error", "Failed to save data. Please check your storage space.");
+        }
     }
     
     setEditingScenario(null);
@@ -404,17 +453,37 @@ const App: React.FC = () => {
             const isPrebuilt = PREBUILT_SCENARIOS.some(s => s.id === scenarioIdToDelete);
 
             if (isPrebuilt) {
-                const deletedPrebuiltIdsRaw = localStorage.getItem(DELETED_PREBUILT_SCENARIOS_KEY);
+                let deletedPrebuiltIdsRaw = null;
+                try {
+                  deletedPrebuiltIdsRaw = localStorage.getItem(DELETED_PREBUILT_SCENARIOS_KEY);
+                } catch (error) {
+                  console.error(error);
+                }
                 const deletedPrebuiltIds: string[] = deletedPrebuiltIdsRaw ? JSON.parse(deletedPrebuiltIdsRaw) : [];
                 if (!deletedPrebuiltIds.includes(scenarioIdToDelete)) {
                     deletedPrebuiltIds.push(scenarioIdToDelete);
-                    localStorage.setItem(DELETED_PREBUILT_SCENARIOS_KEY, JSON.stringify(deletedPrebuiltIds));
+                    try {
+                      localStorage.setItem(DELETED_PREBUILT_SCENARIOS_KEY, JSON.stringify(deletedPrebuiltIds));
+                    } catch (error) {
+                      console.error(error);
+                      showAlert("Storage Error", "Failed to save data. Please check your storage space.");
+                    }
                 }
             } else {
-                const savedCustomScenariosRaw = localStorage.getItem(SCENARIOS_KEY);
+                let savedCustomScenariosRaw = null;
+                try {
+                  savedCustomScenariosRaw = localStorage.getItem(SCENARIOS_KEY);
+                } catch (error) {
+                  console.error(error);
+                }
                 let customScenarios: Scenario[] = savedCustomScenariosRaw ? JSON.parse(savedCustomScenariosRaw) : [];
                 const updatedCustomScenarios = customScenarios.filter(s => s.id !== scenarioIdToDelete);
-                localStorage.setItem(SCENARIOS_KEY, JSON.stringify(updatedCustomScenarios));
+                try {
+                  localStorage.setItem(SCENARIOS_KEY, JSON.stringify(updatedCustomScenarios));
+                } catch (error) {
+                  console.error(error);
+                  showAlert("Storage Error", "Failed to save data. Please check your storage space.");
+                }
             }
 
             const updatedScenarios = scenarios.filter(s => s.id !== scenarioIdToDelete);
@@ -456,7 +525,12 @@ const App: React.FC = () => {
         updatedGlobalCharacters = [...userCharacters, updatedCharacter];
     }
     setUserCharacters(updatedGlobalCharacters);
-    localStorage.setItem(USER_CHARACTERS_KEY, JSON.stringify(updatedGlobalCharacters));
+    try {
+      localStorage.setItem(USER_CHARACTERS_KEY, JSON.stringify(updatedGlobalCharacters));
+    } catch (error) {
+      console.error(error);
+      showAlert("Storage Error", "Failed to save data. Please check your storage space.");
+    }
 
     // 2. Sync this change to all active chats, adding a timestamp to the specific one being edited.
     const updatedActiveChats = activeChats.map(chat => {
@@ -481,7 +555,12 @@ const App: React.FC = () => {
     });
 
     setActiveChats(updatedActiveChats);
-    localStorage.setItem(ACTIVE_CHATS_KEY, JSON.stringify(updatedActiveChats));
+    try {
+      localStorage.setItem(ACTIVE_CHATS_KEY, JSON.stringify(updatedActiveChats));
+    } catch (error) {
+      console.error(error);
+      showAlert("Storage Error", "Failed to save data. Please check your storage space.");
+    }
     
     // 3. Update currentChat state for immediate UI reflection.
     if (currentChat?.id === chatId) {
@@ -561,27 +640,33 @@ const App: React.FC = () => {
   return (
     <div className={`w-full min-h-screen ${showHeaderAndNav ? 'pt-20 pb-20' : ''}`}>
       {confirmation && (
-        <ConfirmationModal
-          isOpen={!!confirmation}
-          title={confirmation.title}
-          message={confirmation.message}
-          onConfirm={confirmation.onConfirm}
-          onClose={() => setConfirmation(null)}
-        />
+        <Suspense fallback={<div>Loading...</div>}>
+          <ConfirmationModal
+            isOpen={!!confirmation}
+            title={confirmation.title}
+            message={confirmation.message}
+            onConfirm={confirmation.onConfirm}
+            onClose={() => setConfirmation(null)}
+          />
+        </Suspense>
       )}
        {alert && (
-        <AlertModal
-          isOpen={!!alert}
-          title={alert.title}
-          message={alert.message}
-          onClose={() => setAlert(null)}
-        />
+        <Suspense fallback={<div>Loading...</div>}>
+          <AlertModal
+            isOpen={!!alert}
+            title={alert.title}
+            message={alert.message}
+            onClose={() => setAlert(null)}
+          />
+        </Suspense>
       )}
       {showHeaderAndNav && <Header onProfileClick={() => handleNavigate('profile')} />}
       <main className={`w-full h-full ${showHeaderAndNav ? 'px-4 sm:px-6' : ''}`}>
-        {content}
+        <Suspense fallback={<div>Loading...</div>}>
+          {content}
+        </Suspense>
       </main>
-      {showHeaderAndNav && <BottomNavBar activeView={getActiveView()} onNavigate={handleNavigate} />}
+      {showHeaderAndNav && <Suspense fallback={<div>Loading...</div>}><BottomNavBar activeView={getActiveView()} onNavigate={handleNavigate} /></Suspense>}
     </div>
   );
 };
