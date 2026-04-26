@@ -49,7 +49,19 @@ export const parseApiResponse = (response: GenerateContentResponse): ModelRespon
         throw new Error("Empty or invalid response from AI. The request may have been blocked by safety filters.");
     }
 
-    const data = JSON.parse(jsonText);
+    // Sanitize jsonText to remove markdown code block formatting if present
+    let cleanedText = jsonText.trim();
+    if (cleanedText.startsWith('```json')) {
+        cleanedText = cleanedText.substring(7);
+    } else if (cleanedText.startsWith('```')) {
+        cleanedText = cleanedText.substring(3);
+    }
+    if (cleanedText.endsWith('```')) {
+        cleanedText = cleanedText.substring(0, cleanedText.length - 3);
+    }
+    cleanedText = cleanedText.trim();
+
+    const data = JSON.parse(cleanedText);
 
     const newPart: ModelResponsePart = {
       narrative: data.narrative || '',
