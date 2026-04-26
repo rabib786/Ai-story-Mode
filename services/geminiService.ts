@@ -283,8 +283,7 @@ export async function generateCharacterPortrait(name: string, description: strin
                 numberOfImages: 1,
                 outputMimeType: 'image/jpeg',
                 aspectRatio: '1:1',
-                safetySettings: safetySettings
-            },
+                            },
         });
 
         // The API can return an empty array if the prompt is flagged. Check for this and provide a better error.
