@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ChatMessage, ActiveChat, ModelResponsePart, UserCharacter, Scenario, ApiSettings } from '../types';
 import { generateStoryPart } from '../services/geminiService';
 import { parseApiResponse, parseNarrative } from '../services/storyUtils';
@@ -687,8 +687,17 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
     };
   }, []);
 
-  const hasUserMessages = chatHistory.some(m => m.role === 'user');
-  const lastActionableModelMessageIndex = chatHistory.map(m => m.role === 'model' && m.type !== 'system' && m.type !== 'error').lastIndexOf(true);
+  const hasUserMessages = useMemo(() => chatHistory.some(m => m.role === 'user'), [chatHistory]);
+
+  const lastActionableModelMessageIndex = useMemo(() => {
+    for (let i = chatHistory.length - 1; i >= 0; i--) {
+      const m = chatHistory[i];
+      if (m.role === 'model' && m.type !== 'system' && m.type !== 'error') {
+        return i;
+      }
+    }
+    return -1;
+  }, [chatHistory]);
 
   const handleEditCharacter = useCallback(() => setCharacterModalOpen(true), []);
 
