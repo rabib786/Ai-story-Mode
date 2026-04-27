@@ -1,3 +1,4 @@
+import { saveToStorageAsync } from '../services/storage';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ChatMessage, ActiveChat, ModelResponsePart, UserCharacter, Scenario, ApiSettings } from '../types';
 import { generateStoryPart } from '../services/geminiService';
@@ -390,7 +391,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
 
   useEffect(() => {
     if (chatHistory.length > 0) {
-      localStorage.setItem(`${CHAT_HISTORY_PREFIX}${chat.id}`, JSON.stringify(chatHistory));
+      saveToStorageAsync(`${CHAT_HISTORY_PREFIX}${chat.id}`, chatHistory);
     }
   }, [chatHistory, chat.id]);
   
@@ -678,7 +679,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
   const handleApiSettingsChange = (field: keyof ApiSettings, value: ApiSettings[keyof ApiSettings]) => {
     setApiSettings(prev => {
       const updated = { ...prev, [field]: value };
-      localStorage.setItem(API_SETTINGS_KEY, JSON.stringify(updated));
+      saveToStorageAsync(API_SETTINGS_KEY, updated);
       return updated;
     });
   };

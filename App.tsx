@@ -13,6 +13,7 @@ const ProfileScreen = React.lazy(() => import('./components/ProfileScreen'));
 const ChatsScreen = React.lazy(() => import('./components/ChatsScreen'));
 import { ACTIVE_CHATS_KEY, SCENARIOS_KEY, CHAT_HISTORY_PREFIX, USER_CHARACTERS_KEY, DELETED_PREBUILT_SCENARIOS_KEY } from './constants/storageKeys';
 import { UserCircleIcon, BookOpenIcon } from './components/icons';
+import { saveToStorageAsync } from './services/storage';
 const ScenarioDetailView = React.lazy(() => import('./components/ScenarioDetailView'));
 const ConfirmationModal = React.lazy(() => import('./components/ConfirmationModal'));
 const AlertModal = React.lazy(() => import('./components/AlertModal'));
@@ -76,7 +77,7 @@ const App: React.FC = () => {
             const prebuiltIds = new Set(PREBUILT_SCENARIOS.map(ps => ps.id));
             if (allScenarios.some(s => prebuiltIds.has(s.id))) {
                 const customScenarios = allScenarios.filter(s => !prebuiltIds.has(s.id));
-                localStorage.setItem(SCENARIOS_KEY, JSON.stringify(customScenarios));
+                saveToStorageAsync(SCENARIOS_KEY, customScenarios);
             }
         } catch (e) {
             console.error("Failed to migrate scenarios, clearing for safety.", e);
@@ -107,7 +108,7 @@ const App: React.FC = () => {
           return { ...s, id: `custom-${crypto.randomUUID()}` };
         });
         if (wasUpdated) {
-          localStorage.setItem(SCENARIOS_KEY, JSON.stringify(migratedCustomScenarios));
+          saveToStorageAsync(SCENARIOS_KEY, migratedCustomScenarios);
         }
 
         const deletedPrebuiltIdsRaw = localStorage.getItem(DELETED_PREBUILT_SCENARIOS_KEY);
@@ -148,7 +149,7 @@ const App: React.FC = () => {
         });
         setUserCharacters(characters);
         if (wasUpdated) {
-             localStorage.setItem(USER_CHARACTERS_KEY, JSON.stringify(characters));
+             saveToStorageAsync(USER_CHARACTERS_KEY, characters);
         }
       } else {
         const defaultCharacter: UserCharacter = {
@@ -158,7 +159,7 @@ const App: React.FC = () => {
           portrait: undefined
         };
         setUserCharacters([defaultCharacter]);
-        localStorage.setItem(USER_CHARACTERS_KEY, JSON.stringify([defaultCharacter]));
+        saveToStorageAsync(USER_CHARACTERS_KEY, [defaultCharacter]);
       }
     } catch (error) {
       console.error("Failed to load or parse user characters, falling back to default:", error);
@@ -175,7 +176,7 @@ const App: React.FC = () => {
   const handleSaveCharacters = (updatedCharacters: UserCharacter[]) => {
     setUserCharacters(updatedCharacters);
     try {
-      localStorage.setItem(USER_CHARACTERS_KEY, JSON.stringify(updatedCharacters));
+      saveToStorageAsync(USER_CHARACTERS_KEY, updatedCharacters);
     } catch (error) {
       console.error(error);
       showAlert("Storage Error", "Failed to save data. Please check your storage space.");
@@ -194,12 +195,7 @@ const App: React.FC = () => {
     // Only update state and storage if there was a meaningful change
     if (JSON.stringify(updatedActiveChats) !== JSON.stringify(activeChats)) {
         setActiveChats(updatedActiveChats);
-        try {
-          localStorage.setItem(ACTIVE_CHATS_KEY, JSON.stringify(updatedActiveChats));
-        } catch (error) {
-          console.error(error);
-          showAlert("Storage Error", "Failed to save data. Please check your storage space.");
-        }
+        saveToStorageAsync(ACTIVE_CHATS_KEY, updatedActiveChats);
     }
   };
 
@@ -236,12 +232,7 @@ const App: React.FC = () => {
 
     const updatedChats = [newChat, ...activeChats.filter(c => c.id !== id)];
     setActiveChats(updatedChats);
-    try {
-      localStorage.setItem(ACTIVE_CHATS_KEY, JSON.stringify(updatedChats));
-    } catch (error) {
-      console.error(error);
-      showAlert("Storage Error", "Failed to save data. Please check your storage space.");
-    }
+    saveToStorageAsync(ACTIVE_CHATS_KEY, updatedChats);
 
     setCurrentChat(newChat);
     setScenarioForSelection(null);
@@ -255,12 +246,7 @@ const App: React.FC = () => {
       );
       updatedChats.sort((a, b) => b.lastUpdate - a.lastUpdate);
       setActiveChats(updatedChats);
-      try {
-        localStorage.setItem(ACTIVE_CHATS_KEY, JSON.stringify(updatedChats));
-      } catch (error) {
-        console.error(error);
-        showAlert("Storage Error", "Failed to save data. Please check your storage space.");
-      }
+      saveToStorageAsync(ACTIVE_CHATS_KEY, updatedChats);
     }
     setCurrentChat(null);
     setCurrentScreen('scenario_selector');
@@ -278,12 +264,7 @@ const App: React.FC = () => {
       onConfirm: () => {
         const updatedChats = activeChats.filter(c => c.id !== chatId);
         setActiveChats(updatedChats);
-        try {
-          localStorage.setItem(ACTIVE_CHATS_KEY, JSON.stringify(updatedChats));
-        } catch (error) {
-          console.error(error);
-          showAlert("Storage Error", "Failed to save data. Please check your storage space.");
-        }
+        saveToStorageAsync(ACTIVE_CHATS_KEY, updatedChats);
         try {
           localStorage.removeItem(`${CHAT_HISTORY_PREFIX}${chatId}`);
         } catch (error) {
@@ -396,7 +377,7 @@ const App: React.FC = () => {
     }
 
     try {
-      localStorage.setItem(SCENARIOS_KEY, JSON.stringify(customScenarios));
+      saveToStorageAsync(SCENARIOS_KEY, customScenarios);
     } catch (error) {
       console.error(error);
       showAlert("Storage Error", "Failed to save data. Please check your storage space.");
@@ -424,12 +405,7 @@ const App: React.FC = () => {
 
     if (JSON.stringify(updatedActiveChats) !== JSON.stringify(activeChats)) {
         setActiveChats(updatedActiveChats);
-        try {
-          localStorage.setItem(ACTIVE_CHATS_KEY, JSON.stringify(updatedActiveChats));
-        } catch (error) {
-          console.error(error);
-          showAlert("Storage Error", "Failed to save data. Please check your storage space.");
-        }
+        saveToStorageAsync(ACTIVE_CHATS_KEY, updatedActiveChats);
     }
     
     setEditingScenario(null);
@@ -463,7 +439,7 @@ const App: React.FC = () => {
                 if (!deletedPrebuiltIds.includes(scenarioIdToDelete)) {
                     deletedPrebuiltIds.push(scenarioIdToDelete);
                     try {
-                      localStorage.setItem(DELETED_PREBUILT_SCENARIOS_KEY, JSON.stringify(deletedPrebuiltIds));
+                      saveToStorageAsync(DELETED_PREBUILT_SCENARIOS_KEY, deletedPrebuiltIds);
                     } catch (error) {
                       console.error(error);
                       showAlert("Storage Error", "Failed to save data. Please check your storage space.");
@@ -479,7 +455,7 @@ const App: React.FC = () => {
                 let customScenarios: Scenario[] = savedCustomScenariosRaw ? JSON.parse(savedCustomScenariosRaw) : [];
                 const updatedCustomScenarios = customScenarios.filter(s => s.id !== scenarioIdToDelete);
                 try {
-                  localStorage.setItem(SCENARIOS_KEY, JSON.stringify(updatedCustomScenarios));
+                  saveToStorageAsync(SCENARIOS_KEY, updatedCustomScenarios);
                 } catch (error) {
                   console.error(error);
                   showAlert("Storage Error", "Failed to save data. Please check your storage space.");
@@ -526,7 +502,7 @@ const App: React.FC = () => {
     }
     setUserCharacters(updatedGlobalCharacters);
     try {
-      localStorage.setItem(USER_CHARACTERS_KEY, JSON.stringify(updatedGlobalCharacters));
+      saveToStorageAsync(USER_CHARACTERS_KEY, updatedGlobalCharacters);
     } catch (error) {
       console.error(error);
       showAlert("Storage Error", "Failed to save data. Please check your storage space.");
@@ -555,12 +531,7 @@ const App: React.FC = () => {
     });
 
     setActiveChats(updatedActiveChats);
-    try {
-      localStorage.setItem(ACTIVE_CHATS_KEY, JSON.stringify(updatedActiveChats));
-    } catch (error) {
-      console.error(error);
-      showAlert("Storage Error", "Failed to save data. Please check your storage space.");
-    }
+    saveToStorageAsync(ACTIVE_CHATS_KEY, updatedActiveChats);
     
     // 3. Update currentChat state for immediate UI reflection.
     if (currentChat?.id === chatId) {
