@@ -3,7 +3,7 @@
 import React from 'react';
 import { XIcon, ChevronRightIcon, ArrowLeftIcon } from './icons';
 import { ApiSettings } from '../types';
-import { LLM_PROVIDER_CONFIG } from '../constants/llmProviders';
+import { LLM_PROVIDER_CONFIG, normalizeApiProvider } from '../constants/llmProviders';
 
 type ResponseLength = 'Long' | 'Medium' | 'Short';
 
@@ -45,13 +45,14 @@ const ToggleSwitch: React.FC<{ enabled: boolean; onChange: (enabled: boolean) =>
 
 
 const StorySettingsModal: React.FC<StorySettingsModalProps> = ({ onClose, settings, onSettingsChange, apiSettings, onApiSettingsChange, onEditCharacter, onViewMemoryBank }) => {
-  const providerConfig = LLM_PROVIDER_CONFIG[apiSettings.provider];
-  const modelOptions = apiSettings.provider === 'gemini'
+  const provider = normalizeApiProvider(apiSettings.provider);
+  const providerConfig = LLM_PROVIDER_CONFIG[provider];
+  const modelOptions = provider === 'gemini'
     ? providerConfig.modelOptions
     : (providerConfig.modelOptions.length > 0 ? providerConfig.modelOptions : [apiSettings.openAiCompatibleModel]);
   
   const handleProviderChange = (provider: ApiSettings['provider']) => {
-    const config = LLM_PROVIDER_CONFIG[provider];
+    const config = LLM_PROVIDER_CONFIG[normalizeApiProvider(provider)];
     onApiSettingsChange('provider', provider);
     if (provider !== 'gemini') {
       onApiSettingsChange('openAiCompatibleBaseUrl', config.defaultBaseUrl || apiSettings.openAiCompatibleBaseUrl);
@@ -105,7 +106,7 @@ const StorySettingsModal: React.FC<StorySettingsModalProps> = ({ onClose, settin
             <div className="bg-zinc-950 rounded-lg p-3">
               <label className="text-xs text-slate-400 mb-1 block">Provider</label>
               <select
-                value={apiSettings.provider}
+                value={provider}
                 onChange={(e) => handleProviderChange(e.target.value as ApiSettings['provider'])}
                 className="w-full bg-zinc-900 border border-zinc-800 rounded-md p-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors text-white"
               >

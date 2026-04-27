@@ -70,3 +70,16 @@ export const LLM_PROVIDER_CONFIG: Record<ApiProvider, ProviderConfig> = {
     requiresApiKey: true,
   },
 };
+
+const PROVIDER_ALIASES: Record<string, ApiProvider> = {
+  "openai-compatible": "custom",
+};
+
+export function normalizeApiProvider(provider: unknown): ApiProvider {
+  if (typeof provider !== "string") return "gemini";
+  const normalized = PROVIDER_ALIASES[provider] || provider;
+  if (normalized in LLM_PROVIDER_CONFIG) {
+    return normalized as ApiProvider;
+  }
+  return "gemini";
+}

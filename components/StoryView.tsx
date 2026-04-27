@@ -10,7 +10,7 @@ import CharacterCreation from './CharacterCreation';
 import MemoryBankModal from './MemoryBankModal';
 import ConfirmationModal from './ConfirmationModal';
 import DynamicBackground from './DynamicBackground';
-import { LLM_PROVIDER_CONFIG } from '../constants/llmProviders';
+import { LLM_PROVIDER_CONFIG, normalizeApiProvider } from '../constants/llmProviders';
 
 interface StoryViewProps {
   chat: ActiveChat;
@@ -227,10 +227,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
       const raw = localStorage.getItem(API_SETTINGS_KEY);
       if (!raw) return defaultApiSettings;
       const parsed = { ...defaultApiSettings, ...JSON.parse(raw) };
-      // Backward compatibility for older app versions.
-      if ((parsed as any).provider === 'openai-compatible') {
-        parsed.provider = 'custom';
-      }
+      parsed.provider = normalizeApiProvider((parsed as any).provider);
       return parsed;
     } catch (error) {
       console.error("Failed to parse API settings:", error);

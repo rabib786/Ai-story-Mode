@@ -1,7 +1,7 @@
 import { GoogleGenAI, GenerateContentResponse, Content, Type, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { logger } from "./logger";
 import { Scenario, ChatMessage, UserCharacter, ModelResponsePart, ApiSettings } from '../types';
-import { LLM_PROVIDER_CONFIG } from "../constants/llmProviders";
+import { LLM_PROVIDER_CONFIG, normalizeApiProvider } from "../constants/llmProviders";
 
 const responseSchema = {
   type: Type.OBJECT,
@@ -172,7 +172,7 @@ export async function generateStoryPart(
         },
     ];
 
-    if (settings.apiSettings.provider !== 'gemini') {
+    if (normalizeApiProvider(settings.apiSettings.provider) !== 'gemini') {
         return generateWithOpenAiCompatible(systemInstruction, contents, settings);
     }
 
@@ -201,7 +201,7 @@ async function generateWithOpenAiCompatible(
   contents: Content[],
   settings: { apiSettings: ApiSettings }
 ): Promise<GenerateContentResponse> {
-  const provider = settings.apiSettings.provider;
+  const provider = normalizeApiProvider(settings.apiSettings.provider);
   const providerConfig = LLM_PROVIDER_CONFIG[provider];
   const apiKey = settings.apiSettings.openAiCompatibleApiKey.trim();
   const baseUrl = (settings.apiSettings.openAiCompatibleBaseUrl || providerConfig.defaultBaseUrl || '').trim().replace(/\/+$/, '');
