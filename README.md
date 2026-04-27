@@ -48,3 +48,4 @@ To build the Android application locally, follow these steps:
    `cd android && ./gradlew assembleDebug`
 
 The generated debug APK will be located at `android/app/build/outputs/apk/debug/app-debug.apk`.
+\n\nNote: Do not commit the generated APK to the repository. It is included in .gitignore.

@@ -1,6 +1,0 @@
-🧹 [Code Health] Replace direct console.error calls with structured logger utility
-
-🎯 What: Replaced direct console.error calls in `services/geminiService.ts` with a new, structured logger utility inside `services/logger.ts`.
-💡 Why: Console logs scattered in production code indicate a lack of structured error handling. This change standardizes logging and prepares the application for more advanced log sinks and integrations in the future while improving maintainability.
-✅ Verification: Ran the existing tests via `bun test` and verified the build succeeds, maintaining all previous application functionality without regressions.
-✨ Result: `generateCharacterPortrait` inside `geminiService.ts` now uses structured logging which properly formats contexts and serializes objects out-of-the-box.
