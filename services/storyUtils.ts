@@ -61,7 +61,7 @@ export const parseApiResponse = (response: GenerateContentResponse): ModelRespon
     }
     cleanedText = cleanedText.trim();
 
-    const data = JSON.parse(cleanedText);
+    const data = JSON.parse(extractJsonPayload(cleanedText));
 
     const newPart: ModelResponsePart = {
       narrative: data.narrative || '',
@@ -76,3 +76,49 @@ export const parseApiResponse = (response: GenerateContentResponse): ModelRespon
     return null;
   }
 };
+
+function extractJsonPayload(rawText: string): string {
+  const trimmed = rawText.trim();
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    return trimmed;
+  }
+
+  let depth = 0;
+  let start = -1;
+  let inString = false;
+  let escapeNext = false;
+
+  for (let i = 0; i < trimmed.length; i++) {
+    const char = trimmed[i];
+
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+    if (char === '\\') {
+      escapeNext = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) {
+      continue;
+    }
+
+    if (char === '{') {
+      if (depth === 0) {
+        start = i;
+      }
+      depth++;
+    } else if (char === '}') {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        return trimmed.slice(start, i + 1);
+      }
+    }
+  }
+
+  return trimmed;
+}

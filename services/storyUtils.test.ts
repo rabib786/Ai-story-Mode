@@ -83,6 +83,21 @@ describe("storyUtils", () => {
         expect.any(Error)
       );
     });
+
+    test("should parse JSON embedded in extra provider text", () => {
+      const mockResponse: GenerateContentResponse = {
+        text: `Here is your result:\n{"narrative":"A hush falls over the room.","suggested_actions":["Speak to the guard"],"memory_additions":["The room went silent."],"dominant_emotion":"mystery"}\nThanks!`
+      } as any;
+
+      const result = parseApiResponse(mockResponse);
+
+      expect(result).toEqual({
+        narrative: "A hush falls over the room.",
+        suggestedActions: ["Speak to the guard"],
+        memoryAdditions: ["The room went silent."],
+        dominantEmotion: "mystery"
+      });
+    });
   });
 
   describe("parseNarrative", () => {
