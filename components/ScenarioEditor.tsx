@@ -1,6 +1,6 @@
 
 import React, { useState, KeyboardEvent, ChangeEvent, useEffect } from 'react';
-import { Scenario, ScenarioCharacter } from '../types';
+import { Scenario, ScenarioCharacter, StoryCard } from '../types';
 import { PlusIcon, Trash2Icon, UserIcon, ArrowLeftIcon, InfoIcon, XIcon, CheckIcon, EditIcon, RefreshCwIcon, Wand2Icon } from './icons';
 import ScenarioCharacterEditor from './ScenarioCharacterEditor';
 
@@ -21,6 +21,7 @@ const createInitialScenario = (): Scenario => ({
   greetingMessage: '',
   customInstructions: '',
   characters: [],
+  storyCards: [],
   views: 0,
   rating: 0,
   forceCharacter: undefined,
@@ -156,6 +157,10 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({ onSave, onBack, initial
   const [editingCharacter, setEditingCharacter] = useState<{data: ScenarioCharacter, index: number} | null>(null);
   const [tagInput, setTagInput] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [newStoryCardTitle, setNewStoryCardTitle] = useState('');
+  const [newStoryCardContent, setNewStoryCardContent] = useState('');
+  const [newStoryCardTriggers, setNewStoryCardTriggers] = useState('');
+  const [newStoryCardAlwaysActive, setNewStoryCardAlwaysActive] = useState(false);
 
   const [showIntroduction, setShowIntroduction] = useState(false);
   const [showGreeting, setShowGreeting] = useState(true);
@@ -238,6 +243,41 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({ onSave, onBack, initial
       return;
     }
     onSave(scenario);
+  };
+
+  const handleAddStoryCard = () => {
+    const title = newStoryCardTitle.trim();
+    const content = newStoryCardContent.trim();
+    if (!title || !content) return;
+
+    const triggers = newStoryCardTriggers
+      .split(',')
+      .map((trigger) => trigger.trim().toLowerCase())
+      .filter(Boolean);
+
+    const storyCard: StoryCard = {
+      id: crypto.randomUUID(),
+      title,
+      content,
+      triggers,
+      alwaysActive: newStoryCardAlwaysActive,
+    };
+
+    setScenario((prev) => ({
+      ...prev,
+      storyCards: [...(prev.storyCards || []), storyCard],
+    }));
+    setNewStoryCardTitle('');
+    setNewStoryCardContent('');
+    setNewStoryCardTriggers('');
+    setNewStoryCardAlwaysActive(false);
+  };
+
+  const handleRemoveStoryCard = (cardId: string) => {
+    setScenario((prev) => ({
+      ...prev,
+      storyCards: (prev.storyCards || []).filter((card) => card.id !== cardId),
+    }));
   };
 
   const totalCharacterLength = scenario.characters.reduce((acc, char) => {
@@ -362,10 +402,76 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({ onSave, onBack, initial
             </FormSection>
         ) : <AddSectionButton onClick={() => setShowCustomInstructions(true)} label="Add Custom Scenario Instructions" />}
 
-        <button type="button" className="w-full flex items-center justify-center gap-2 border-2 border-zinc-800 bg-zinc-950 rounded-lg p-3 text-slate-500 cursor-not-allowed" disabled>
-          <PlusIcon className="w-5 h-5"/>
-          Add Story Cards
-        </button>
+        <FormSection
+          title="Story Cards"
+          info="Story Cards are lore snippets injected into the model context when relevant triggers appear."
+          titleChildren={<span className="text-sm font-normal text-slate-500">{(scenario.storyCards || []).length} cards</span>}
+        >
+          <div className="space-y-3">
+            {(scenario.storyCards || []).map((card) => (
+              <div key={card.id} className="rounded-lg border border-zinc-800 bg-black p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold text-cyan-300">{card.title}</h3>
+                    <p className="text-sm text-slate-300 mt-1 whitespace-pre-wrap">{card.content}</p>
+                    <p className="text-xs text-slate-500 mt-2">
+                      Triggers: {card.alwaysActive ? 'Always active' : (card.triggers.length ? card.triggers.join(', ') : 'None')}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveStoryCard(card.id)}
+                    className="p-1 text-slate-400 hover:text-red-400"
+                    title="Delete Story Card"
+                  >
+                    <Trash2Icon className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-lg border border-zinc-800 bg-black p-3 space-y-3">
+            <LabeledInput
+              id="story-card-title"
+              label="Card Title"
+              value={newStoryCardTitle}
+              onChange={(e) => setNewStoryCardTitle(e.target.value)}
+              maxLength={60}
+              placeholder="Ancient Pact"
+            />
+            <LabeledTextarea
+              id="story-card-content"
+              label="Card Content"
+              value={newStoryCardContent}
+              onChange={(e) => setNewStoryCardContent(e.target.value)}
+              maxLength={1200}
+              rows={4}
+              placeholder="The city is secretly bound by a blood pact..."
+            />
+            <LabeledInput
+              id="story-card-triggers"
+              label="Triggers (comma separated)"
+              value={newStoryCardTriggers}
+              onChange={(e) => setNewStoryCardTriggers(e.target.value)}
+              maxLength={200}
+              placeholder="pact, blood oath, council"
+            />
+            <div className="flex items-center justify-between p-2">
+              <label className="text-sm font-medium text-slate-300">Always Active</label>
+              <ToggleSwitch enabled={newStoryCardAlwaysActive} onChange={setNewStoryCardAlwaysActive} />
+            </div>
+            <button
+              type="button"
+              onClick={handleAddStoryCard}
+              disabled={!newStoryCardTitle.trim() || !newStoryCardContent.trim()}
+              className="w-full flex items-center justify-center gap-2 border border-zinc-700 bg-zinc-900 rounded-lg p-2.5 text-slate-200 hover:border-sky-500 hover:text-sky-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <PlusIcon className="w-4 h-4" />
+              Add Story Card
+            </button>
+          </div>
+        </FormSection>
 
         <FormSection 
             title="Story Characters"

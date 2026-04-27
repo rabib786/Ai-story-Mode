@@ -431,6 +431,61 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
     const textToSend = (messageText || userInput).trim();
     if (!textToSend || isLoading) return;
 
+    if (textToSend.startsWith('/')) {
+      const executeSlashCommand = async () => {
+        const normalized = textToSend.toLowerCase();
+
+        const pushSystemMessage = (narrative: string) => {
+          const systemMessage: ChatMessage = {
+            id: `system-cmd-${Date.now()}`,
+            role: 'model',
+            type: 'system',
+            parts: [{ narrative: `<i class="text-slate-400 text-center block w-full">${narrative}</i>`, suggestedActions: [] }],
+            currentPartIndex: 0,
+          };
+          setChatHistory((prev) => [...prev, systemMessage]);
+        };
+
+        if (normalized === '/help') {
+          pushSystemMessage('Available commands: /help, /continue, /rewind, /regenerate, /delete, /memory');
+          return;
+        }
+        if (normalized === '/continue') {
+          setUserInput('');
+          await handleContinue();
+          return;
+        }
+        if (normalized === '/rewind') {
+          setUserInput('');
+          handleRewind();
+          return;
+        }
+        if (normalized === '/regenerate') {
+          setUserInput('');
+          await handleRegenerate();
+          return;
+        }
+        if (normalized === '/delete') {
+          setUserInput('');
+          handleDeleteLastResponse();
+          return;
+        }
+        if (normalized === '/memory') {
+          const summary = memoryBank.length
+            ? `Memory bank has ${memoryBank.length} entries.`
+            : 'Memory bank is currently empty.';
+          pushSystemMessage(summary);
+          setUserInput('');
+          return;
+        }
+
+        pushSystemMessage(`Unknown command: ${textToSend}`);
+      };
+
+      await executeSlashCommand();
+      return;
+    }
+
     setUserInput('');
     setIsLoading(true);
 
