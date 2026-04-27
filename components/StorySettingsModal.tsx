@@ -3,6 +3,7 @@
 import React from 'react';
 import { XIcon, ChevronRightIcon, ArrowLeftIcon } from './icons';
 import { ApiSettings } from '../types';
+import { LLM_PROVIDER_CONFIG } from '../constants/llmProviders';
 
 type ResponseLength = 'Long' | 'Medium' | 'Short';
 
@@ -44,6 +45,10 @@ const ToggleSwitch: React.FC<{ enabled: boolean; onChange: (enabled: boolean) =>
 
 
 const StorySettingsModal: React.FC<StorySettingsModalProps> = ({ onClose, settings, onSettingsChange, apiSettings, onApiSettingsChange, onEditCharacter, onViewMemoryBank }) => {
+  const providerConfig = LLM_PROVIDER_CONFIG[apiSettings.provider];
+  const modelOptions = apiSettings.provider === 'gemini'
+    ? providerConfig.modelOptions
+    : (providerConfig.modelOptions.length > 0 ? providerConfig.modelOptions : [apiSettings.openAiCompatibleModel]);
 
   const handleCustomInstructionsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     if (e.target.value.length <= 300) {
@@ -100,16 +105,11 @@ const StorySettingsModal: React.FC<StorySettingsModalProps> = ({ onClose, settin
                 style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em' }}
                 aria-label="Select Large Language Model"
               >
-                {apiSettings.provider === 'gemini' ? (
-                  <>
-                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                    <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                  </>
-                ) : (
-                  <>
-                    <option value={apiSettings.openAiCompatibleModel}>{apiSettings.openAiCompatibleModel}</option>
-                  </>
-                )}
+                {modelOptions.map(model => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
               </select>
             </div>
           </SettingsSection>
@@ -120,11 +120,29 @@ const StorySettingsModal: React.FC<StorySettingsModalProps> = ({ onClose, settin
                 <label className="text-xs text-slate-400 mb-1 block">Provider</label>
                 <select
                   value={apiSettings.provider}
-                  onChange={(e) => onApiSettingsChange('provider', e.target.value as ApiSettings['provider'])}
+                  onChange={(e) => {
+                    const provider = e.target.value as ApiSettings['provider'];
+                    const config = LLM_PROVIDER_CONFIG[provider];
+                    onApiSettingsChange('provider', provider);
+                    if (provider !== 'gemini') {
+                      onApiSettingsChange('openAiCompatibleBaseUrl', config.defaultBaseUrl || apiSettings.openAiCompatibleBaseUrl);
+                      onApiSettingsChange('openAiCompatibleModel', config.defaultModel);
+                      onSettingsChange('model', config.defaultModel);
+                    } else {
+                      onApiSettingsChange('geminiModel', config.defaultModel);
+                      onSettingsChange('model', config.defaultModel);
+                    }
+                  }}
                   className="w-full bg-zinc-900 border border-zinc-800 rounded-md p-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors text-white"
                 >
                   <option value="gemini">Gemini API</option>
-                  <option value="openai-compatible">Custom / OpenAI-Compatible</option>
+                  <option value="openai">OpenAI</option>
+                  <option value="openrouter">OpenRouter (free models)</option>
+                  <option value="groq">Groq</option>
+                  <option value="together">Together AI</option>
+                  <option value="deepseek">DeepSeek</option>
+                  <option value="ollama">Ollama (local/free)</option>
+                  <option value="custom">Custom / OpenAI-Compatible</option>
                 </select>
               </div>
 
@@ -147,11 +165,12 @@ const StorySettingsModal: React.FC<StorySettingsModalProps> = ({ onClose, settin
                       type="text"
                       value={apiSettings.openAiCompatibleBaseUrl}
                       onChange={(e) => onApiSettingsChange('openAiCompatibleBaseUrl', e.target.value)}
-                      placeholder="https://api.openai.com/v1"
+                      placeholder={providerConfig.defaultBaseUrl || 'https://api.openai.com/v1'}
                       className="w-full bg-zinc-900 border border-zinc-800 rounded-md p-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors"
+                      disabled={apiSettings.provider !== 'custom'}
                     />
                   </div>
-                  <div>
+                  {providerConfig.requiresApiKey && <div>
                     <label className="text-xs text-slate-400 mb-1 block">API Key</label>
                     <input
                       type="password"
@@ -160,7 +179,7 @@ const StorySettingsModal: React.FC<StorySettingsModalProps> = ({ onClose, settin
                       placeholder="sk-..."
                       className="w-full bg-zinc-900 border border-zinc-800 rounded-md p-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors"
                     />
-                  </div>
+                  </div>}
                   <div>
                     <label className="text-xs text-slate-400 mb-1 block">Model</label>
                     <input

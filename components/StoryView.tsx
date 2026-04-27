@@ -10,6 +10,7 @@ import CharacterCreation from './CharacterCreation';
 import MemoryBankModal from './MemoryBankModal';
 import ConfirmationModal from './ConfirmationModal';
 import DynamicBackground from './DynamicBackground';
+import { LLM_PROVIDER_CONFIG } from '../constants/llmProviders';
 
 interface StoryViewProps {
   chat: ActiveChat;
@@ -30,10 +31,10 @@ interface StorySettings {
 const defaultApiSettings: ApiSettings = {
   provider: 'gemini',
   geminiApiKey: '',
-  geminiModel: 'gemini-2.5-flash',
+  geminiModel: LLM_PROVIDER_CONFIG.gemini.defaultModel,
   openAiCompatibleApiKey: '',
-  openAiCompatibleBaseUrl: 'https://api.openai.com/v1',
-  openAiCompatibleModel: 'gpt-4o-mini',
+  openAiCompatibleBaseUrl: LLM_PROVIDER_CONFIG.openai.defaultBaseUrl || 'https://api.openai.com/v1',
+  openAiCompatibleModel: LLM_PROVIDER_CONFIG.openai.defaultModel,
 };
 
 interface ConfirmationState {
@@ -224,7 +225,13 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
   const [apiSettings, setApiSettings] = useState<ApiSettings>(() => {
     try {
       const raw = localStorage.getItem(API_SETTINGS_KEY);
-      return raw ? { ...defaultApiSettings, ...JSON.parse(raw) } : defaultApiSettings;
+      if (!raw) return defaultApiSettings;
+      const parsed = { ...defaultApiSettings, ...JSON.parse(raw) };
+      // Backward compatibility for older app versions.
+      if ((parsed as any).provider === 'openai-compatible') {
+        parsed.provider = 'custom';
+      }
+      return parsed;
     } catch (error) {
       console.error("Failed to parse API settings:", error);
       return defaultApiSettings;
