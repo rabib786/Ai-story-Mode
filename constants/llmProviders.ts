@@ -2,6 +2,7 @@ import { ApiProvider } from "../types";
 
 export interface ProviderConfig {
   label: string;
+  description?: string;
   defaultBaseUrl?: string;
   defaultModel: string;
   modelOptions: string[];
@@ -17,13 +18,15 @@ export const LLM_PROVIDER_CONFIG: Record<ApiProvider, ProviderConfig> = {
   },
   openai: {
     label: "OpenAI",
+    description: "Official OpenAI API",
     defaultBaseUrl: "https://api.openai.com/v1",
     defaultModel: "gpt-4o-mini",
-    modelOptions: ["gpt-4o-mini", "gpt-4.1-mini", "gpt-4.1-nano"],
+    modelOptions: ["gpt-4o-mini", "gpt-4.1-mini", "gpt-4.1-nano", "gpt-4o"],
     requiresApiKey: true,
   },
   openrouter: {
     label: "OpenRouter (Free + Paid)",
+    description: "Best source for free hosted models",
     defaultBaseUrl: "https://openrouter.ai/api/v1",
     defaultModel: "meta-llama/llama-3.1-8b-instruct:free",
     modelOptions: [
@@ -31,6 +34,8 @@ export const LLM_PROVIDER_CONFIG: Record<ApiProvider, ProviderConfig> = {
       "deepseek/deepseek-chat-v3-0324:free",
       "google/gemma-3-27b-it:free",
       "qwen/qwen3-30b-a3b:free",
+      "microsoft/phi-3-mini-128k-instruct:free",
+      "mistralai/mistral-7b-instruct:free",
     ],
     requiresApiKey: true,
   },
@@ -55,8 +60,47 @@ export const LLM_PROVIDER_CONFIG: Record<ApiProvider, ProviderConfig> = {
     modelOptions: ["deepseek-chat", "deepseek-reasoner"],
     requiresApiKey: true,
   },
+  cerebras: {
+    label: "Cerebras",
+    defaultBaseUrl: "https://api.cerebras.ai/v1",
+    defaultModel: "llama-3.3-70b",
+    modelOptions: ["llama-3.3-70b", "qwen-3-32b"],
+    requiresApiKey: true,
+  },
+  sambanova: {
+    label: "SambaNova",
+    defaultBaseUrl: "https://api.sambanova.ai/v1",
+    defaultModel: "Meta-Llama-3.3-70B-Instruct",
+    modelOptions: ["Meta-Llama-3.3-70B-Instruct", "Qwen2.5-72B-Instruct"],
+    requiresApiKey: true,
+  },
+  fireworks: {
+    label: "Fireworks AI",
+    defaultBaseUrl: "https://api.fireworks.ai/inference/v1",
+    defaultModel: "accounts/fireworks/models/llama-v3p1-8b-instruct",
+    modelOptions: [
+      "accounts/fireworks/models/llama-v3p1-8b-instruct",
+      "accounts/fireworks/models/qwen3-30b-a3b",
+    ],
+    requiresApiKey: true,
+  },
+  mistral: {
+    label: "Mistral API",
+    defaultBaseUrl: "https://api.mistral.ai/v1",
+    defaultModel: "mistral-small-latest",
+    modelOptions: ["mistral-small-latest", "open-mistral-nemo", "ministral-8b-latest"],
+    requiresApiKey: true,
+  },
+  xai: {
+    label: "xAI (Grok)",
+    defaultBaseUrl: "https://api.x.ai/v1",
+    defaultModel: "grok-3-mini",
+    modelOptions: ["grok-3-mini", "grok-3", "grok-2-1212"],
+    requiresApiKey: true,
+  },
   ollama: {
     label: "Ollama (Local / Free)",
+    description: "Run fully local models on your own machine",
     defaultBaseUrl: "http://localhost:11434/v1",
     defaultModel: "llama3.1:8b",
     modelOptions: ["llama3.1:8b", "qwen2.5:7b", "mistral:7b-instruct"],

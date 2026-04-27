@@ -241,6 +241,7 @@ async function generateWithOpenAiCompatible(
       response_format: {
         type: 'json_object',
       },
+      max_tokens: 2048,
     }),
   });
 
@@ -253,6 +254,7 @@ async function generateWithOpenAiCompatible(
         model,
         messages,
         temperature: 0.9,
+        max_tokens: 2048,
       }),
     });
   }
@@ -263,15 +265,71 @@ async function generateWithOpenAiCompatible(
   }
 
   const data = await response.json();
-  const rawContent = data?.choices?.[0]?.message?.content;
-  const text = Array.isArray(rawContent)
-    ? rawContent.map((part: any) => part?.text || '').join('\n')
-    : rawContent;
+  const text = extractTextFromOpenAiPayload(data);
+
+  // Some providers return empty content on strict JSON mode. Retry once without JSON mode, with an explicit instruction.
+  if (!text) {
+    const plainTextRetry = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model,
+        messages: [
+          ...messages,
+          {
+            role: 'system',
+            content:
+              'Return valid raw JSON only with keys: narrative, suggested_actions, memory_additions, dominant_emotion. Do not include markdown.',
+          },
+        ],
+        temperature: 0.9,
+        max_tokens: 2048,
+      }),
+    });
+
+    if (plainTextRetry.ok) {
+      const retryData = await plainTextRetry.json();
+      const retryText = extractTextFromOpenAiPayload(retryData);
+      if (retryText) {
+        return { text: retryText } as GenerateContentResponse;
+      }
+    }
+  }
+
   if (!text) {
     throw new Error('OpenAI-compatible API returned an empty response.');
   }
 
   return { text } as GenerateContentResponse;
+}
+
+function extractTextFromOpenAiPayload(data: any): string {
+  const message = data?.choices?.[0]?.message;
+  const rawContent = message?.content;
+
+  if (typeof rawContent === 'string') {
+    return rawContent.trim();
+  }
+
+  if (Array.isArray(rawContent)) {
+    return rawContent
+      .map((part: any) => {
+        if (typeof part === 'string') return part;
+        if (typeof part?.text === 'string') return part.text;
+        if (typeof part?.output_text === 'string') return part.output_text;
+        if (typeof part?.content === 'string') return part.content;
+        return '';
+      })
+      .join('\n')
+      .trim();
+  }
+
+  const fallbackText = data?.choices?.[0]?.text;
+  if (typeof fallbackText === 'string') {
+    return fallbackText.trim();
+  }
+
+  return '';
 }
 
 

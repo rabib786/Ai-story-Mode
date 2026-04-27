@@ -74,6 +74,11 @@ export type ApiProvider =
   | 'groq'
   | 'together'
   | 'deepseek'
+  | 'cerebras'
+  | 'sambanova'
+  | 'fireworks'
+  | 'mistral'
+  | 'xai'
   | 'ollama'
   | 'custom';
 

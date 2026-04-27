@@ -46,6 +46,7 @@ const ToggleSwitch: React.FC<{ enabled: boolean; onChange: (enabled: boolean) =>
 
 const StorySettingsModal: React.FC<StorySettingsModalProps> = ({ onClose, settings, onSettingsChange, apiSettings, onApiSettingsChange, onEditCharacter, onViewMemoryBank }) => {
   const providerConfig = LLM_PROVIDER_CONFIG[apiSettings.provider];
+  const providerEntries = Object.entries(LLM_PROVIDER_CONFIG) as Array<[ApiSettings['provider'], typeof providerConfig]>;
   const modelOptions = apiSettings.provider === 'gemini'
     ? providerConfig.modelOptions
     : (providerConfig.modelOptions.length > 0 ? providerConfig.modelOptions : [apiSettings.openAiCompatibleModel]);
@@ -135,15 +136,13 @@ const StorySettingsModal: React.FC<StorySettingsModalProps> = ({ onClose, settin
                   }}
                   className="w-full bg-zinc-900 border border-zinc-800 rounded-md p-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors text-white"
                 >
-                  <option value="gemini">Gemini API</option>
-                  <option value="openai">OpenAI</option>
-                  <option value="openrouter">OpenRouter (free models)</option>
-                  <option value="groq">Groq</option>
-                  <option value="together">Together AI</option>
-                  <option value="deepseek">DeepSeek</option>
-                  <option value="ollama">Ollama (local/free)</option>
-                  <option value="custom">Custom / OpenAI-Compatible</option>
+                  {providerEntries.map(([providerKey, config]) => (
+                    <option key={providerKey} value={providerKey}>{config.label}</option>
+                  ))}
                 </select>
+                {providerConfig.description && (
+                  <p className="text-xs text-slate-500 mt-1">{providerConfig.description}</p>
+                )}
               </div>
 
               {apiSettings.provider === 'gemini' ? (
