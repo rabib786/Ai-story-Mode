@@ -67,7 +67,15 @@ export interface ActiveChat {
   memoryBank: string[];
 }
 
-export type ApiProvider = 'gemini' | 'openai-compatible';
+export type ApiProvider =
+  | 'gemini'
+  | 'openai'
+  | 'openrouter'
+  | 'groq'
+  | 'together'
+  | 'deepseek'
+  | 'ollama'
+  | 'custom';
 
 export interface ApiSettings {
   provider: ApiProvider;

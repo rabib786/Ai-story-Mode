@@ -21,12 +21,18 @@ View your app in AI Studio: https://ai.studio/apps/drive/1iV2W08bTRbGmy5w1gYr6jt
 
 ## API Providers
 
-The app now supports two providers from **Story Settings → API Configuration**:
+From **Story Settings → API Configuration**, you can now use:
 
 - **Gemini API** (default)
-  - Uses an in-app Gemini key, or falls back to `GEMINI_API_KEY` / `API_KEY` from `.env.local`.
-- **Custom / OpenAI-Compatible**
-  - Configure Base URL, API key, and model for any OpenAI-compatible `/chat/completions` endpoint.
+- **OpenAI**
+- **OpenRouter** (includes free model options)
+- **Groq**
+- **Together AI**
+- **DeepSeek**
+- **Ollama** (local/free, no API key needed)
+- **Custom / OpenAI-compatible**
+
+For Gemini, the app can use an in-app key or fallback to `GEMINI_API_KEY` / `API_KEY` from `.env.local`.
 
 ## Build Android APK
 

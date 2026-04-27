@@ -1,6 +1,7 @@
 import { GoogleGenAI, GenerateContentResponse, Content, Type, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { logger } from "./logger";
 import { Scenario, ChatMessage, UserCharacter, ModelResponsePart, ApiSettings } from '../types';
+import { LLM_PROVIDER_CONFIG } from "../constants/llmProviders";
 
 const responseSchema = {
   type: Type.OBJECT,
@@ -171,7 +172,7 @@ export async function generateStoryPart(
         },
     ];
 
-    if (settings.apiSettings.provider === 'openai-compatible') {
+    if (settings.apiSettings.provider !== 'gemini') {
         return generateWithOpenAiCompatible(systemInstruction, contents, settings);
     }
 
@@ -200,12 +201,17 @@ async function generateWithOpenAiCompatible(
   contents: Content[],
   settings: { apiSettings: ApiSettings }
 ): Promise<GenerateContentResponse> {
+  const provider = settings.apiSettings.provider;
+  const providerConfig = LLM_PROVIDER_CONFIG[provider];
   const apiKey = settings.apiSettings.openAiCompatibleApiKey.trim();
-  const baseUrl = settings.apiSettings.openAiCompatibleBaseUrl.trim().replace(/\/+$/, '');
-  const model = settings.apiSettings.openAiCompatibleModel.trim();
+  const baseUrl = (settings.apiSettings.openAiCompatibleBaseUrl || providerConfig.defaultBaseUrl || '').trim().replace(/\/+$/, '');
+  const model = (settings.apiSettings.openAiCompatibleModel || providerConfig.defaultModel).trim();
 
-  if (!apiKey || !baseUrl || !model) {
-    throw new Error('OpenAI-compatible settings are incomplete. Please provide Base URL, API key, and model.');
+  if (!baseUrl || !model) {
+    throw new Error('Provider settings are incomplete. Please provide Base URL and model.');
+  }
+  if (providerConfig.requiresApiKey && !apiKey) {
+    throw new Error(`${providerConfig.label} API key is missing. Add it in Settings > API Configuration.`);
   }
 
   const messages = [
@@ -216,12 +222,18 @@ async function generateWithOpenAiCompatible(
     })),
   ];
 
-  const response = await fetch(`${baseUrl}/chat/completions`, {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+  if (provider === 'openrouter') {
+    headers['HTTP-Referer'] = window.location.origin;
+    headers['X-Title'] = 'Story Mode AI';
+  }
+
+  let response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
+    headers,
     body: JSON.stringify({
       model,
       messages,
@@ -232,13 +244,29 @@ async function generateWithOpenAiCompatible(
     }),
   });
 
+  // Fallback for providers/models that reject response_format json mode.
+  if (!response.ok && [400, 404, 422].includes(response.status)) {
+    response = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: 0.9,
+      }),
+    });
+  }
+
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`OpenAI-compatible request failed (${response.status}): ${errorText}`);
   }
 
   const data = await response.json();
-  const text = data?.choices?.[0]?.message?.content;
+  const rawContent = data?.choices?.[0]?.message?.content;
+  const text = Array.isArray(rawContent)
+    ? rawContent.map((part: any) => part?.text || '').join('\n')
+    : rawContent;
   if (!text) {
     throw new Error('OpenAI-compatible API returned an empty response.');
   }
