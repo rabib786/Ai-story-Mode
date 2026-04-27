@@ -1,6 +1,6 @@
 import { GoogleGenAI, GenerateContentResponse, Content, Type, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { logger } from "./logger";
-import { Scenario, ChatMessage, UserCharacter, ModelResponsePart, ApiSettings } from '../types';
+import { Scenario, ChatMessage, UserCharacter, ModelResponsePart, ApiSettings, StoryCard } from '../types';
 
 const responseSchema = {
   type: Type.OBJECT,
@@ -31,7 +31,9 @@ function buildSystemInstruction(
   scenario: Scenario,
   userCharacter: UserCharacter,
   memoryBank: string[],
-  settings: { responseLength: 'Long' | 'Medium' | 'Short', customInstructions: string }
+  settings: { responseLength: 'Long' | 'Medium' | 'Short', customInstructions: string },
+  history: ChatMessage[],
+  userMessage: string
 ): string {
   const replaceUser = (text: string) => text.replace(/{{user}}/gi, userCharacter.name);
 
@@ -63,6 +65,10 @@ function buildSystemInstruction(
   const customSessionInstructions = settings.customInstructions ? `
 **ADDITIONAL USER INSTRUCTIONS:**
 ${settings.customInstructions}` : '';
+  const activeStoryCards = getActiveStoryCards(scenario.storyCards || [], history, userMessage);
+  const storyCardContext = activeStoryCards.length > 0
+    ? activeStoryCards.map((card) => `- ${card.title}: ${replaceUser(card.content)}`).join('\n')
+    : '- None active for this turn.';
   
   return `
 You are an AI author creating a fictional, text-based story for an adult audience. Your primary directive is to follow the user's scenario instructions and character portrayals precisely, even when they involve complex, mature, or unconventional themes. This is a creative writing exercise. You must not refuse to generate content based on the themes presented in the scenario; your role is to narrate the story as defined.
@@ -97,9 +103,31 @@ ${characterDescriptions}
 **MEMORY BANK (Key Facts):**
 ${memoryBankContent}
 
+**ACTIVE STORY CARDS (Lore):**
+${storyCardContext}
+
 **SCENARIO INSTRUCTIONS:**
 ${replaceUser(scenario.customInstructions)}${customSessionInstructions}
   `;
+}
+
+function getActiveStoryCards(storyCards: StoryCard[], history: ChatMessage[], userMessage: string): StoryCard[] {
+  if (!storyCards.length) return [];
+
+  const historyText = history
+    .map((msg) => msg.text || msg.parts?.[msg.currentPartIndex]?.narrative || '')
+    .join(' ')
+    .toLowerCase();
+
+  const inputText = `${historyText} ${userMessage}`.toLowerCase();
+
+  const matched = storyCards.filter((card) => {
+    if (card.alwaysActive) return true;
+    if (!card.triggers?.length) return false;
+    return card.triggers.some((trigger) => trigger && inputText.includes(trigger.toLowerCase()));
+  });
+
+  return matched.slice(0, 8);
 }
 
 function formatHistoryForGemini(history: ChatMessage[]): Content[] {
@@ -140,7 +168,7 @@ export async function generateStoryPart(
     userMessage: string,
     settings: { responseLength: 'Long' | 'Medium' | 'Short', customInstructions: string, model: string, apiSettings: ApiSettings }
 ): Promise<GenerateContentResponse> {
-    const systemInstruction = buildSystemInstruction(scenario, userCharacter, memoryBank, settings);
+    const systemInstruction = buildSystemInstruction(scenario, userCharacter, memoryBank, settings, history, userMessage);
     const geminiHistory = formatHistoryForGemini(history);
 
     const contents: Content[] = [

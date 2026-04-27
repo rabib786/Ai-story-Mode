@@ -6,6 +6,14 @@ export interface ScenarioCharacter {
   portrait?: string;
 }
 
+export interface StoryCard {
+  id: string;
+  title: string;
+  content: string;
+  triggers: string[];
+  alwaysActive?: boolean;
+}
+
 export interface Scenario {
   id: string;
   name:string;
@@ -17,6 +25,7 @@ export interface Scenario {
   greetingMessage?: string;
   customInstructions: string;
   characters: ScenarioCharacter[];
+  storyCards?: StoryCard[];
   views: number;
   rating: number;
   
