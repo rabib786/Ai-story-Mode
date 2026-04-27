@@ -104,10 +104,10 @@ interface ModelMessageBubbleProps {
     onChangePart: (messageId: string, direction: 'next' | 'prev') => void;
     onPlayTTS: (messageId: string, text: string) => void;
     enableTTS: boolean;
-    onRewind: () => void;
-    onRegenerate: () => void;
-    onContinue: () => void;
-    onDeleteLastResponse: () => void;
+    onRewind?: () => void;
+    onRegenerate?: () => void;
+    onContinue?: () => void;
+    onDeleteLastResponse?: () => void;
 }
 
 
@@ -738,10 +738,11 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
               onPlayTTS={handlePlayTTS}
               enableTTS={settings.enableTTS}
               hasUserMessages={hasUserMessages}
-              onRewind={handleRewind}
-              onRegenerate={handleRegenerate}
-              onContinue={handleContinue}
-              onDeleteLastResponse={handleDeleteLastResponse}
+              // ⚡ Bolt Optimization: Pass undefined for historical items to preserve React.memo and prevent O(N) re-renders
+              onRewind={index === lastActionableModelMessageIndex ? handleRewind : undefined}
+              onRegenerate={index === lastActionableModelMessageIndex ? handleRegenerate : undefined}
+              onContinue={index === lastActionableModelMessageIndex ? handleContinue : undefined}
+              onDeleteLastResponse={index === lastActionableModelMessageIndex ? handleDeleteLastResponse : undefined}
             />
           )
         ))}
