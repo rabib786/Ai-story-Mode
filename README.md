@@ -29,6 +29,8 @@ From **Story Settings → API Configuration**, you can now use:
 - **Groq**
 - **Together AI**
 - **DeepSeek**
+- **Pollinations (hosted/free, no API key)**
+- **LM Studio** (local/free, no API key)
 - **Ollama** (local/free, no API key needed)
 - **Custom / OpenAI-compatible**
 

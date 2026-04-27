@@ -79,6 +79,8 @@ export type ApiProvider =
   | 'fireworks'
   | 'mistral'
   | 'xai'
+  | 'pollinations'
+  | 'lmstudio'
   | 'ollama'
   | 'custom';
 

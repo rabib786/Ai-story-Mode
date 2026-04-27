@@ -98,6 +98,22 @@ export const LLM_PROVIDER_CONFIG: Record<ApiProvider, ProviderConfig> = {
     modelOptions: ["grok-3-mini", "grok-3", "grok-2-1212"],
     requiresApiKey: true,
   },
+  pollinations: {
+    label: "Pollinations (Hosted Free)",
+    description: "Free hosted OpenAI-compatible endpoint (no API key required)",
+    defaultBaseUrl: "https://text.pollinations.ai/openai",
+    defaultModel: "openai-large",
+    modelOptions: ["openai-large", "openai", "mistral", "llama"],
+    requiresApiKey: false,
+  },
+  lmstudio: {
+    label: "LM Studio (Local / Free)",
+    description: "Use local models served from LM Studio's OpenAI-compatible API",
+    defaultBaseUrl: "http://localhost:1234/v1",
+    defaultModel: "local-model",
+    modelOptions: ["local-model"],
+    requiresApiKey: false,
+  },
   ollama: {
     label: "Ollama (Local / Free)",
     description: "Run fully local models on your own machine",
