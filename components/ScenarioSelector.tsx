@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { Scenario } from '../types';
-import { Trash2Icon, BookOpenIcon, PlusIcon } from './icons';
+import { Trash2Icon, BookOpenIcon, PlusIcon, SearchIcon } from './icons';
 
 interface ScenarioSelectorProps {
   scenarios: Scenario[];
@@ -61,6 +61,27 @@ const ScenarioCard = React.memo(({ scenario, onSelect, onDelete }: { scenario: S
 ));
 
 const ScenarioSelector: React.FC<ScenarioSelectorProps> = ({ scenarios, onSelectScenario, onStartCreation, onDeleteScenario }) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTag, setSelectedTag] = useState<string>('all');
+
+  const availableTags = useMemo(() => {
+    const tags = new Set<string>();
+    scenarios.forEach((scenario) => scenario.tags.forEach((tag) => tags.add(tag)));
+    return ['all', ...Array.from(tags).sort((a, b) => a.localeCompare(b))];
+  }, [scenarios]);
+
+  const filteredScenarios = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    return scenarios.filter((scenario) => {
+      const tagMatch = selectedTag === 'all' || scenario.tags.includes(selectedTag);
+      if (!tagMatch) return false;
+      if (!normalizedQuery) return true;
+
+      const searchableText = `${scenario.name} ${scenario.description} ${scenario.tags.join(' ')}`.toLowerCase();
+      return searchableText.includes(normalizedQuery);
+    });
+  }, [scenarios, searchQuery, selectedTag]);
+
   return (
     <div className="w-full max-w-5xl mx-auto animate-fade-in-scale">
        <div className="text-center mb-10">
@@ -69,8 +90,39 @@ const ScenarioSelector: React.FC<ScenarioSelectorProps> = ({ scenarios, onSelect
               </h1>
               <p className="text-slate-400 mt-3 max-w-2xl mx-auto">Select a pre-built world crafted for immersive storytelling, or bring your own universe to life.</p>
         </div>
+      <div className="mb-6 space-y-4">
+        <label htmlFor="scenario-search" className="relative block">
+          <SearchIcon className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            id="scenario-search"
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by title, description, or tags..."
+            className="w-full rounded-lg border border-zinc-700 bg-zinc-950/80 py-2.5 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+          />
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {availableTags.map((tag) => {
+            const isActive = selectedTag === tag;
+            return (
+              <button
+                key={tag}
+                onClick={() => setSelectedTag(tag)}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  isActive
+                    ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-500/60'
+                    : 'bg-zinc-900 text-slate-300 border border-zinc-700 hover:border-cyan-500/40 hover:text-cyan-200'
+                }`}
+              >
+                {tag === 'all' ? 'All tags' : tag}
+              </button>
+            );
+          })}
+        </div>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {scenarios.map((scenario) => (
+        {filteredScenarios.map((scenario) => (
           <ScenarioCard
             key={scenario.id}
             scenario={scenario}
@@ -78,6 +130,12 @@ const ScenarioSelector: React.FC<ScenarioSelectorProps> = ({ scenarios, onSelect
             onDelete={onDeleteScenario}
           />
         ))}
+        {filteredScenarios.length === 0 && (
+          <div className="md:col-span-2 lg:col-span-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-8 text-center">
+            <p className="text-slate-300 font-semibold">No matching scenarios</p>
+            <p className="text-slate-500 mt-2 text-sm">Try changing the search text or pick another tag.</p>
+          </div>
+        )}
         <div
             className="rounded-lg p-6 border-2 border-dashed border-zinc-800 hover:border-cyan-500 hover:bg-zinc-950 transition-all duration-300 flex flex-col items-center justify-center text-center text-slate-500 cursor-pointer transform hover:-translate-y-1 group aspect-[4/3]"
             onClick={onStartCreation}
