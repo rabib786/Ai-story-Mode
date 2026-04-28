@@ -1,9 +1,10 @@
 
 
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { XIcon, ChevronRightIcon, ArrowLeftIcon } from './icons';
 import { ApiSettings } from '../types';
 import { LLM_PROVIDER_CONFIG } from '../constants/llmProviders';
+import { listOpenRouterFreeModelIds } from '../services/openrouterService';
 
 type ResponseLength = 'Long' | 'Medium' | 'Short';
 
@@ -47,9 +48,34 @@ const ToggleSwitch: React.FC<{ enabled: boolean; onChange: (enabled: boolean) =>
 const StorySettingsModal: React.FC<StorySettingsModalProps> = ({ onClose, settings, onSettingsChange, apiSettings, onApiSettingsChange, onEditCharacter, onViewMemoryBank }) => {
   const providerConfig = LLM_PROVIDER_CONFIG[apiSettings.provider];
   const providerEntries = Object.entries(LLM_PROVIDER_CONFIG) as Array<[ApiSettings['provider'], typeof providerConfig]>;
-  const modelOptions = apiSettings.provider === 'gemini'
-    ? providerConfig.modelOptions
-    : (providerConfig.modelOptions.length > 0 ? providerConfig.modelOptions : [apiSettings.openAiCompatibleModel]);
+  const [openRouterModels, setOpenRouterModels] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (apiSettings.provider !== 'openrouter') return;
+
+    const apiKey = apiSettings.openAiCompatibleApiKey.trim();
+    if (!apiKey) {
+      setOpenRouterModels([]);
+      return;
+    }
+
+    listOpenRouterFreeModelIds(apiKey)
+      .then((models) => setOpenRouterModels(models))
+      .catch(() => setOpenRouterModels([]));
+  }, [apiSettings.provider, apiSettings.openAiCompatibleApiKey]);
+
+  const modelOptions = useMemo(() => {
+    if (apiSettings.provider === 'gemini') {
+      return providerConfig.modelOptions;
+    }
+
+    if (apiSettings.provider === 'openrouter' && openRouterModels.length > 0) {
+      const merged = [providerConfig.defaultModel, ...openRouterModels];
+      return Array.from(new Set(merged));
+    }
+
+    return providerConfig.modelOptions.length > 0 ? providerConfig.modelOptions : [apiSettings.openAiCompatibleModel];
+  }, [apiSettings.provider, apiSettings.openAiCompatibleModel, openRouterModels, providerConfig]);
 
   const handleCustomInstructionsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     if (e.target.value.length <= 300) {
@@ -142,6 +168,9 @@ const StorySettingsModal: React.FC<StorySettingsModalProps> = ({ onClose, settin
                 </select>
                 {providerConfig.description && (
                   <p className="text-xs text-slate-500 mt-1">{providerConfig.description}</p>
+                )}
+                {apiSettings.provider === 'openrouter' && (
+                  <p className="text-xs text-slate-500 mt-1">Enter your OpenRouter API key to load the latest free models automatically.</p>
                 )}
               </div>
 
