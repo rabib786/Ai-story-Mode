@@ -242,7 +242,7 @@ const App: React.FC = () => {
   const handleExitStory = useCallback((finalMemoryBank: string[]) => {
     if (currentChat) {
       const updatedChats = activeChats.map(c =>
-        c.id === currentChat.id ? { ...c, lastUpdate: Date.now(), memoryBank: finalMemoryBank.slice(-50) } : c
+        c.id === currentChat.id ? { ...c, lastUpdate: Date.now(), memoryBank: (finalMemoryBank || []).slice(-50) } : c
       );
       updatedChats.sort((a, b) => b.lastUpdate - a.lastUpdate);
       setActiveChats(updatedChats);

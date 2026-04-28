@@ -212,7 +212,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [memoryBank, setMemoryBank] = useState<string[]>(chat.memoryBank);
+  const [memoryBank, setMemoryBank] = useState<string[]>(chat.memoryBank || []);
   const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
   const [isCharacterModalOpen, setCharacterModalOpen] = useState(false);
   const [isMemoryBankModalOpen, setMemoryBankModalOpen] = useState(false);
@@ -269,7 +269,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
                               prevSettings.model !== settings.model;
       if (settingsChanged) {
         const systemMessage: ChatMessage = {
-          id: `system-settings-${Date.now()}`,
+          id: `system-settings-${crypto.randomUUID()}`,
           role: 'model', type: 'system',
           parts: [{ narrative: `<i class="text-slate-400 text-center block w-full">Settings updated.</i>`, suggestedActions: [] }],
           currentPartIndex: 0,
@@ -282,7 +282,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
     const prevUserCharacter = prevUserCharacterRef.current;
     if (prevUserCharacter && JSON.stringify(prevUserCharacter) !== JSON.stringify(chat.userCharacter)) {
         const systemMessage: ChatMessage = {
-            id: `system-char-${Date.now()}`,
+            id: `system-char-${crypto.randomUUID()}`,
             role: 'model', type: 'system',
             parts: [{ narrative: `<i class="text-slate-400 text-center block w-full">Character updated to ${chat.userCharacter.name}.</i>`, suggestedActions: [] }],
             currentPartIndex: 0,
@@ -338,7 +338,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
           dominantEmotion: 'neutral',
         };
         const greetingMessage: ChatMessage = {
-          id: `model-greeting-${Date.now()}`,
+          id: `model-greeting-${crypto.randomUUID()}`,
           role: 'model',
           parts: [greetingPart],
           currentPartIndex: 0,
@@ -346,7 +346,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
         setChatHistory([greetingMessage]);
         setIsLoading(false);
       } else {
-        const messageId = `model-${Date.now()}`;
+        const messageId = `model-${crypto.randomUUID()}`;
         setChatHistory([{ id: messageId, role: 'model', parts: [emptyPart], currentPartIndex: 0 }]);
         
         try {
@@ -443,12 +443,12 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
     setIsLoading(true);
 
     const userMessage: ChatMessage = {
-      id: `user-${Date.now()}`,
+      id: `user-${crypto.randomUUID()}`,
       role: 'user',
       text: textToSend,
       currentPartIndex: 0,
     };
-    const modelMessageId = `model-${Date.now()}`;
+    const modelMessageId = `model-${crypto.randomUUID()}`;
     const modelMessagePlaceholder: ChatMessage = {
       id: modelMessageId,
       role: 'model',
@@ -543,7 +543,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
     } catch (error) {
         handleApiError(chatHistory[modelMessageIndex].id, error);
         const errorMsg: ChatMessage = { 
-            id: `system-error-${Date.now()}`, 
+            id: `system-error-${crypto.randomUUID()}`,
             role: 'model', 
             type: 'system', 
             parts: [{ narrative: `<i class="text-amber-400 text-center block w-full">Failed to regenerate. Please try again.</i>`, suggestedActions: []}], 
@@ -561,7 +561,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
     setIsLoading(true);
     const continueInstruction = "(SYSTEM: Continue the story from the last message. Do not write a user action. Simply continue the narrative.)";
     
-    const modelMessageId = `model-${Date.now()}`;
+    const modelMessageId = `model-${crypto.randomUUID()}`;
     const modelMessagePlaceholder: ChatMessage = {
       id: modelMessageId,
       role: 'model', parts: [emptyPart], currentPartIndex: 0,
