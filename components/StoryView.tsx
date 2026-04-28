@@ -1,4 +1,5 @@
 import { saveToStorageAsync } from '../services/storage';
+import { getDraft, saveDraft, clearDraft } from '../services/draftService';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ChatMessage, ActiveChat, ModelResponsePart, UserCharacter, Scenario, ApiSettings } from '../types';
 import { generateStoryPart } from '../services/geminiService';
@@ -216,6 +217,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
   const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
   const [isCharacterModalOpen, setCharacterModalOpen] = useState(false);
   const [isMemoryBankModalOpen, setMemoryBankModalOpen] = useState(false);
+  const [showDraftRestored, setShowDraftRestored] = useState(false);
   const [settings, setSettings] = useState<StorySettings>({
     responseLength: 'Medium',
     showResponseSuggestions: !chat.scenario.hideScenarioPrompts,
@@ -399,9 +401,38 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
     }
   }, [chat.id, chat.scenario, chat.userCharacter, recalculateMemoryBankFromHistory, settings, apiSettings, handleApiError]);
   
-  useEffect(() => {
+useEffect(() => {
     initializeStory();
   }, [initializeStory]);
+
+  // Handle draft restore
+  useEffect(() => {
+    const draft = getDraft(chat.id);
+    if (draft && !userInput) {
+      setUserInput(draft);
+      setShowDraftRestored(true);
+      setTimeout(() => setShowDraftRestored(false), 3000);
+    }
+  }, [chat.id]);
+
+  // Handle draft autosave (periodic and on unload)
+  useEffect(() => {
+    const autosaveInterval = setInterval(() => {
+        saveDraft(chat.id, userInput);
+    }, 5000);
+
+    const handleBeforeUnload = () => {
+        saveDraft(chat.id, userInput);
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+        clearInterval(autosaveInterval);
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+        saveDraft(chat.id, userInput); // Save on unmount
+    };
+  }, [chat.id, userInput]);
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -464,6 +495,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
 
     setUserInput('');
     setIsLoading(true);
+    clearDraft(chat.id);
 
     const userMessage: ChatMessage = {
       id: `user-${crypto.randomUUID()}`,
@@ -795,6 +827,12 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
                 </div>
             )}
             
+            {showDraftRestored && (
+                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-sky-900/80 text-sky-200 text-xs px-3 py-1.5 rounded-full backdrop-blur-md border border-sky-500/30 animate-fade-in shadow-lg whitespace-nowrap z-10 flex items-center gap-1.5">
+                    <InfoIcon className="w-3 h-3" />
+                    Restored unsaved draft
+                </div>
+            )}
             <div className="flex items-end gap-2">
                 <form 
                     onSubmit={(e) => { e.preventDefault(); if (userInput.trim()) { handleSendMessage(); } }} 

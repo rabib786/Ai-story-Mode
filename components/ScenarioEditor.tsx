@@ -1,8 +1,9 @@
 
 import React, { useState, KeyboardEvent, ChangeEvent, useEffect } from 'react';
 import { Scenario, ScenarioCharacter } from '../types';
-import { PlusIcon, Trash2Icon, UserIcon, ArrowLeftIcon, InfoIcon, XIcon, CheckIcon, EditIcon, RefreshCwIcon, Wand2Icon } from './icons';
+import { PlusIcon, Trash2Icon, UserIcon, ArrowLeftIcon, InfoIcon, XIcon, CheckIcon, EditIcon, RefreshCwIcon, Wand2Icon, AlertTriangleIcon } from './icons';
 import ScenarioCharacterEditor from './ScenarioCharacterEditor';
+import { analyzeDescription, analyzeWorldDetails, checkFormattingIssues, Suggestion } from '../services/scenarioSuggestions';
 
 interface ScenarioEditorProps {
   onSave: (scenario: Scenario) => void;
@@ -231,12 +232,34 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({ onSave, onBack, initial
     setScenario(prev => ({...prev, characters: prev.characters.filter((_, index) => index !== indexToRemove)}));
   };
 
-  const handleSave = () => {
+const handleSave = () => {
     if (!scenario.name.trim()) {
       setError("Please provide a name for your scenario.");
       window.scrollTo(0,0);
       return;
     }
+    if (!scenario.description.trim() || scenario.description.length < 10) {
+      setError("Description is too short. Please provide at least 10 characters.");
+      window.scrollTo(0,0);
+      return;
+    }
+    if (!scenario.worldDetails.trim() || scenario.worldDetails.length < 50) {
+      setError("Backstory / World Details are too short. Please provide at least 50 characters.");
+      window.scrollTo(0,0);
+      return;
+    }
+
+    // Check formatting globally
+    const allText = `${scenario.description} ${scenario.worldDetails} ${scenario.introduction || ''} ${scenario.greetingMessage || ''} ${scenario.customInstructions}`;
+    const formatIssue = checkFormattingIssues(allText);
+    if (formatIssue && formatIssue.type === 'warning') {
+        if (!confirm(`Warning: ${formatIssue.message}
+
+Are you sure you want to save anyway?`)) {
+            return;
+        }
+    }
+
     onSave(scenario);
   };
 
@@ -266,6 +289,7 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({ onSave, onBack, initial
         <FormSection title="Details & Metadata">
              <LabeledInput id="name" label="Scenario Name" value={scenario.name} onChange={handleInputChange} maxLength={35} placeholder="Life Experiment" />
             <LabeledTextarea id="description" label="Scenario Description" value={scenario.description} onChange={handleInputChange} maxLength={250} rows={3} placeholder="In a vibrant American city..." />
+            <SuggestionBox suggestions={analyzeDescription(scenario.description)} />
             
              <div>
                 <div className="flex justify-between items-center mb-1">
@@ -328,6 +352,7 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({ onSave, onBack, initial
                 actions={<button onClick={() => { setShowIntroduction(false); setScenario(p => ({...p, introduction: undefined})); }} className="p-1 text-slate-500 hover:text-white"><XIcon className="w-4 h-4"/></button>}
              >
                 <LabeledTextarea id="introduction" label="" value={scenario.introduction || ''} onChange={(e) => setScenario(p=>({...p, introduction: e.target.value}))} maxLength={1000} rows={4} placeholder="Write a brief introduction that appears before the story begins..." />
+                <SuggestionBox suggestions={checkFormattingIssues(scenario.introduction || '')} />
             </FormSection>
         )}
 
@@ -335,6 +360,7 @@ const ScenarioEditor: React.FC<ScenarioEditorProps> = ({ onSave, onBack, initial
         
         <FormSection title="Backstory / World Details">
             <LabeledTextarea id="worldDetails" label="" value={scenario.worldDetails} onChange={handleInputChange} maxLength={3000} rows={12} placeholder={BACKSTORY_PLACEHOLDER} showAiButton={true} />
+            <SuggestionBox suggestions={[...analyzeWorldDetails(scenario.worldDetails, scenario.characters), ...(checkFormattingIssues(scenario.worldDetails) ? [checkFormattingIssues(scenario.worldDetails) as Suggestion] : [])]} />
         </FormSection>
         
         {showGreeting ? (
