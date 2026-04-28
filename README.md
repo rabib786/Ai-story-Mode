@@ -36,6 +36,15 @@ From **Story Settings → API Configuration**, you can now use:
 
 For Gemini, the app can use an in-app key or fallback to `GEMINI_API_KEY` / `API_KEY` from `.env.local`.
 
+
+### OpenRouter Free Models (Dynamic + Validation)
+
+- In **Story Settings → API Configuration**, choose **OpenRouter** and add your API key.
+- The app now fetches the latest free text-capable model list from `GET /api/v1/models` and populates model selection automatically.
+- Default model is `openrouter/free` (OpenRouter's free router).
+- To validate every currently available free model end-to-end, run:
+  `OPENROUTER_API_KEY=... npm run test:openrouter:free`
+
 ## Build Android APK
 
 To build the Android application locally, follow these steps:

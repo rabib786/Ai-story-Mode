@@ -2,6 +2,7 @@ import { GoogleGenAI, GenerateContentResponse, Content, Type, HarmCategory, Harm
 import { logger } from "./logger";
 import { Scenario, ChatMessage, UserCharacter, ModelResponsePart, ApiSettings } from '../types';
 import { LLM_PROVIDER_CONFIG } from "../constants/llmProviders";
+import { requestOpenRouterCompletion } from './openrouterService';
 
 const responseSchema = {
   type: Type.OBJECT,
@@ -227,8 +228,26 @@ async function generateWithOpenAiCompatible(
   };
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
   if (provider === 'openrouter') {
-    headers['HTTP-Referer'] = window.location.origin;
-    headers['X-Title'] = 'Story Mode AI';
+    let response = await requestOpenRouterCompletion(baseUrl, apiKey, {
+      model,
+      messages,
+      temperature: 0.9,
+      max_tokens: 2048,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OpenRouter request failed (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    const text = extractTextFromOpenAiPayload(data);
+
+    if (text) {
+      return { text } as GenerateContentResponse;
+    }
+
+    throw new Error('OpenRouter API returned an empty response.');
   }
 
   let response = await fetch(`${baseUrl}/chat/completions`, {
