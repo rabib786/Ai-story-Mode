@@ -204,9 +204,9 @@ async function generateWithOpenAiCompatible(
 ): Promise<GenerateContentResponse> {
   const provider = settings.apiSettings.provider;
   const providerConfig = LLM_PROVIDER_CONFIG[provider];
-  const apiKey = settings.apiSettings.openAiCompatibleApiKey.trim();
-  const baseUrl = (settings.apiSettings.openAiCompatibleBaseUrl || providerConfig.defaultBaseUrl || '').trim().replace(/\/+$/, '');
-  const model = (settings.apiSettings.openAiCompatibleModel || providerConfig.defaultModel).trim();
+  const apiKey = `${settings.apiSettings.openAiCompatibleApiKey || ''}`.trim();
+  const baseUrl = `${settings.apiSettings.openAiCompatibleBaseUrl || providerConfig.defaultBaseUrl || ''}`.trim().replace(/\/+$/, '');
+  const model = `${settings.apiSettings.openAiCompatibleModel || providerConfig.defaultModel || ''}`.trim();
 
   if (!baseUrl || !model) {
     throw new Error('Provider settings are incomplete. Please provide Base URL and model.');
