@@ -295,6 +295,29 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
   
   const handleApiError = useCallback((messageId: string, error?: any) => {
      if (error) console.error("API Error:", error);
+     let errorMessage = '<i class="text-red-400">The story encountered an error. Please try again.</i>';
+
+     if (error?.name === 'ApiError') {
+         switch (error.code) {
+            case 'AUTH_ERROR':
+                errorMessage = `<i class="text-amber-400 block w-full text-center">Authentication failed. Please check your API key in settings.</i>`;
+                break;
+            case 'QUOTA_ERROR':
+                errorMessage = `<i class="text-amber-400 block w-full text-center">API quota exceeded or rate limited. Please check your billing or wait a moment.</i>`;
+                break;
+            case 'MODEL_ERROR':
+                errorMessage = `<i class="text-amber-400 block w-full text-center">The selected model is unavailable or incorrect. Please check your settings.</i>`;
+                break;
+            case 'TIMEOUT_ERROR':
+                errorMessage = `<i class="text-amber-400 block w-full text-center">The connection timed out or the server is unreachable. Please try again.</i>`;
+                break;
+            default:
+                errorMessage = `<i class="text-red-400 block w-full text-center">${error.message || 'An unknown API error occurred. Please try again.'}</i>`;
+         }
+     } else if (error?.message) {
+         errorMessage = `<i class="text-red-400 block w-full text-center">${error.message}</i>`;
+     }
+
      setChatHistory(prev => {
         const messageIndex = prev.findIndex(m => m.id === messageId);
         if (messageIndex === -1) return prev;
@@ -302,7 +325,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
         updatedHistory[messageIndex] = { 
             ...prev[messageIndex], 
             type: 'error', 
-            parts: [{ narrative: errorNarrative, suggestedActions: [] }], 
+            parts: [{ narrative: errorMessage, suggestedActions: [] }],
             currentPartIndex: 0 
         };
         return updatedHistory;
