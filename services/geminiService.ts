@@ -3,6 +3,7 @@ import { logger } from "./logger";
 import { Scenario, ChatMessage, UserCharacter, ModelResponsePart, ApiSettings } from '../types';
 import { LLM_PROVIDER_CONFIG } from "../constants/llmProviders";
 import { requestOpenRouterCompletion } from './openrouterService';
+import { withRetry, ApiError } from './apiUtils';
 
 const responseSchema = {
   type: Type.OBJECT,
@@ -184,17 +185,25 @@ export async function generateStoryPart(
 
     const ai = new GoogleGenAI({ apiKey });
 
-    return ai.models.generateContent({
-      model: settings.apiSettings.geminiModel || settings.model || 'gemini-2.5-flash',
-      contents: contents,
-      config: {
-          systemInstruction: systemInstruction,
-          responseMimeType: "application/json",
-          responseSchema: responseSchema,
-          ...generationConfig,
-          safetySettings: safetySettings
-      },
-    });
+    return withRetry(async () => {
+        try {
+            return await ai.models.generateContent({
+              model: settings.apiSettings.geminiModel || settings.model || 'gemini-2.5-flash',
+              contents: contents,
+              config: {
+                  systemInstruction: systemInstruction,
+                  responseMimeType: "application/json",
+                  responseSchema: responseSchema,
+                  ...generationConfig,
+                  safetySettings: safetySettings
+              },
+            });
+        } catch (e: any) {
+             // Let withRetry handle it, just map the status code if we can find it
+             if (e.status) e.statusCode = e.status;
+             throw e;
+        }
+    }, 'gemini');
 }
 
 async function generateWithOpenAiCompatible(
@@ -228,26 +237,29 @@ async function generateWithOpenAiCompatible(
   };
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
   if (provider === 'openrouter') {
-    let response = await requestOpenRouterCompletion(baseUrl, apiKey, {
-      model,
-      messages,
-      temperature: 0.9,
-      max_tokens: 2048,
-    });
+    return withRetry(async () => {
+        let response = await requestOpenRouterCompletion(baseUrl, apiKey, {
+          model,
+          messages,
+          temperature: 0.9,
+          max_tokens: 2048,
+        });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`OpenRouter request failed (${response.status}): ${errorText}`);
-    }
+        if (!response.ok) {
+            const error = new Error(`OpenRouter request failed (${response.status})`);
+            (error as any).status = response.status;
+            throw error;
+        }
 
-    const data = await response.json();
-    const text = extractTextFromOpenAiPayload(data);
+        const data = await response.json();
+        const text = extractTextFromOpenAiPayload(data);
 
-    if (text) {
-      return { text } as GenerateContentResponse;
-    }
+        if (text) {
+          return { text } as GenerateContentResponse;
+        }
 
-    throw new Error('OpenRouter API returned an empty response.');
+        throw new Error('OpenRouter API returned an empty response.');
+    }, 'openrouter');
   }
 
   let response = await fetch(`${baseUrl}/chat/completions`, {
