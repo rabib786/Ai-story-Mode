@@ -9,7 +9,7 @@ export const parseNarrative = (narrative: string): Array<{type: 'text' | 'dialog
   if (!narrative) return [];
   const parts: Array<{type: 'text' | 'dialogue', content: string}> = [];
   let lastIndex = 0;
-  const regex = /<dialogue>(.*?)<\/dialogue>/gs; // s flag for multiline
+  const regex = /<dialogue>(.*?)<\/dialogue>/gis; // s flag for multiline, i for case-insensitive tags
   let match;
 
   while ((match = regex.exec(narrative)) !== null) {
@@ -64,10 +64,10 @@ export const parseApiResponse = (response: GenerateContentResponse): ModelRespon
     const data = JSON.parse(extractJsonPayload(cleanedText));
 
     const newPart: ModelResponsePart = {
-      narrative: data.narrative || '',
-      suggestedActions: data.suggested_actions || [],
-      memoryAdditions: data.memory_additions || [],
-      dominantEmotion: data.dominant_emotion || 'neutral',
+      narrative: typeof data.narrative === 'string' ? data.narrative : '',
+      suggestedActions: normalizeStringArray(data.suggested_actions),
+      memoryAdditions: normalizeStringArray(data.memory_additions),
+      dominantEmotion: typeof data.dominant_emotion === 'string' && data.dominant_emotion.trim() ? data.dominant_emotion : 'neutral',
     };
 
     return newPart;
@@ -121,4 +121,13 @@ function extractJsonPayload(rawText: string): string {
   }
 
   return trimmed;
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
 }

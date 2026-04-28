@@ -43,6 +43,26 @@ describe("storyUtils", () => {
       });
     });
 
+    test("should sanitize malformed field types from model response", () => {
+      const mockResponse: GenerateContentResponse = {
+        text: JSON.stringify({
+          narrative: 1234,
+          suggested_actions: ["Go left", "", 42, "  Open door  "],
+          memory_additions: "not-an-array",
+          dominant_emotion: "   ",
+        }),
+      } as any;
+
+      const result = parseApiResponse(mockResponse);
+
+      expect(result).toEqual({
+        narrative: "",
+        suggestedActions: ["Go left", "Open door"],
+        memoryAdditions: [],
+        dominantEmotion: "neutral",
+      });
+    });
+
     test("should return null and log error if response text is empty", () => {
       const mockResponse: GenerateContentResponse = {
         text: ""
@@ -135,6 +155,14 @@ describe("storyUtils", () => {
           { type: "text", content: "He shouted " },
           { type: "dialogue", content: "Wait!" }
         ]);
+    });
+
+    test("should parse dialogue tags case-insensitively", () => {
+      const input = "She whispered <DIALOGUE>Be quiet.</DIALOGUE>";
+      expect(parseNarrative(input)).toEqual([
+        { type: "text", content: "She whispered " },
+        { type: "dialogue", content: "Be quiet." }
+      ]);
     });
   });
 });
