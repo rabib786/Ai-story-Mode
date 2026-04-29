@@ -1,3 +1,17 @@
+
+export interface CharacterArc {
+  goals: string[];
+  conflict: string;
+  growthCheckpoints: string[];
+}
+
+export interface RelationshipState {
+  targetCharacterId: string; // id or name
+  level: number; // e.g. -100 to 100
+  label: string; // e.g. "trust", "rivalry"
+  history: string[]; // logs of changes
+}
+
 export interface ScenarioCharacter {
   name: string;
   role: string;
@@ -65,6 +79,16 @@ export interface ActiveChat {
   userCharacter: UserCharacter;
   lastUpdate: number;
   memoryBank: MemoryEntry[];
+
+    // Phase 2: Branching Timeline
+    rootChatId?: string; // The ID of the original chat this branch descends from (or its own id if root)
+    parentId?: string; // The ID of the chat this branch directly forked from
+    forkedAtMessageId?: string; // The message ID in the parent chat where the fork occurred
+
+    // Phase 2: Character Depth Features
+    characterArcs?: Record<string, CharacterArc>; // Map character name/id to their arc
+    relationshipMatrix?: Record<string, Record<string, RelationshipState>>; // charA -> charB -> relationship
+
 }
 
 export type ApiProvider =

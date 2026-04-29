@@ -5,19 +5,24 @@ import { ChatMessage, ActiveChat, ModelResponsePart, UserCharacter, Scenario, Ap
 import { generateStoryPart } from '../services/geminiService';
 import { parseApiResponse, parseNarrative } from '../services/storyUtils';
 import { type GenerateContentResponse } from '@google/genai';
-import { SendIcon, ArrowLeftIcon, RefreshCwIcon, SettingsIcon, EyeIcon, StarIcon, ChevronLeftIcon, ChevronRightIcon, LightbulbIcon, UserIcon, Volume2Icon, StopCircleIcon, ChevronsRightIcon, Trash2Icon, Undo2Icon, MoreHorizontalIcon, ScissorsIcon, FlameIcon, GitBranchIcon, InfoIcon } from './icons';
+import { SendIcon, ArrowLeftIcon, RefreshCwIcon, SettingsIcon, EyeIcon, StarIcon, ChevronLeftIcon, ChevronRightIcon, LightbulbIcon, UserIcon, Volume2Icon, StopCircleIcon, ChevronsRightIcon, Trash2Icon, Undo2Icon, MoreHorizontalIcon, ScissorsIcon, FlameIcon, GitBranchIcon, InfoIcon, TargetIcon, NetworkIcon } from './icons';
 import { CHAT_HISTORY_PREFIX, API_SETTINGS_KEY } from '../constants/storageKeys';
 import StorySettingsModal from './StorySettingsModal';
 import CharacterCreation from './CharacterCreation';
 import MemoryBankModal from './MemoryBankModal';
 import ConfirmationModal from './ConfirmationModal';
 import DynamicBackground from './DynamicBackground';
+import CharacterDepthModal from './CharacterDepthModal';
+import BranchTreeModal from './BranchTreeModal';
 import { LLM_PROVIDER_CONFIG } from '../constants/llmProviders';
 
 interface StoryViewProps {
   chat: ActiveChat;
+  allChats: ActiveChat[];
   onExit: (finalMemoryBank: string[]) => void;
   onUpdateUserCharacter: (chatId: string, updatedCharacter: UserCharacter) => void;
+  onUpdateChat: (chat: ActiveChat) => void;
+  onBranchChat: (chatId: string, messageId: string) => void;
 }
 
 type ResponseLength = 'Long' | 'Medium' | 'Short';
@@ -111,6 +116,7 @@ interface ModelMessageBubbleProps {
     onRegenerate?: () => void;
     onContinue?: () => void;
     onDeleteLastResponse?: () => void;
+    onBranch?: (messageId: string) => void;
 }
 
 
@@ -128,6 +134,7 @@ const ModelMessageBubble = React.memo(({
     onRegenerate,
     onContinue,
     onDeleteLastResponse,
+    onBranch,
 }: ModelMessageBubbleProps) => {
     const currentPart = message.parts ? message.parts[message.currentPartIndex] : null;
     const narrativeToRender = currentPart?.narrative || '';
@@ -209,7 +216,7 @@ const ModelMessageBubble = React.memo(({
 });
 
 
-const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharacter }) => {
+const StoryView: React.FC<StoryViewProps> = ({ chat, allChats, onExit, onUpdateUserCharacter, onUpdateChat, onBranchChat }) => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -218,6 +225,8 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, onExit, onUpdateUserCharact
   const [isCharacterModalOpen, setCharacterModalOpen] = useState(false);
   const [isMemoryBankModalOpen, setMemoryBankModalOpen] = useState(false);
   const [showDraftRestored, setShowDraftRestored] = useState(false);
+    const [isCharacterDepthModalOpen, setCharacterDepthModalOpen] = useState(false);
+    const [isBranchTreeModalOpen, setBranchTreeModalOpen] = useState(false);
   const [settings, setSettings] = useState<StorySettings>({
     responseLength: 'Medium',
     showResponseSuggestions: !chat.scenario.hideScenarioPrompts,
@@ -806,7 +815,8 @@ useEffect(() => {
               onRegenerate={index === lastActionableModelMessageIndex ? handleRegenerate : undefined}
               onContinue={index === lastActionableModelMessageIndex ? handleContinue : undefined}
               onDeleteLastResponse={index === lastActionableModelMessageIndex ? handleDeleteLastResponse : undefined}
-            />
+                onBranch={onBranchChat}
+                />
           )
         ))}
       </div>
@@ -862,7 +872,25 @@ useEffect(() => {
         </div>
       </footer>
 
-      {isSettingsModalOpen && <StorySettingsModal 
+      {isCharacterDepthModalOpen && (
+            <CharacterDepthModal
+                chat={chat}
+                onClose={() => setCharacterDepthModalOpen(false)}
+                onUpdateChat={onUpdateChat}
+            />
+        )}
+        {isBranchTreeModalOpen && (
+            <BranchTreeModal
+                currentChat={chat}
+                allChats={allChats}
+                onClose={() => setBranchTreeModalOpen(false)}
+                onResumeChat={(chatToResume) => {
+                    onExit(memoryBank);
+                    window.dispatchEvent(new CustomEvent('resumeChat', { detail: chatToResume }));
+                }}
+            />
+        )}
+        {isSettingsModalOpen && <StorySettingsModal
         onClose={() => setSettingsModalOpen(false)} 
         settings={settings} 
         onSettingsChange={handleSettingsChange} 
