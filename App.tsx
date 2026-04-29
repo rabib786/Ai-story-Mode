@@ -66,6 +66,16 @@ const App: React.FC = () => {
   const [confirmation, setConfirmation] = useState<ConfirmationState | null>(null);
   const [alert, setAlert] = useState<AlertState | null>(null);
 
+  useEffect(() => {
+    const handleResumeEvent = (e: any) => {
+        if (e.detail) {
+            handleResumeChat(e.detail);
+        }
+    };
+    window.addEventListener('resumeChat', handleResumeEvent);
+    return () => window.removeEventListener('resumeChat', handleResumeEvent);
+  }, [activeChats]);
+
   const showAlert = (title: string, message: string) => setAlert({ title, message });
   
   useEffect(() => {
@@ -277,7 +287,15 @@ const App: React.FC = () => {
     const branchedHistory = history.slice(0, splitIndex + 1);
     const newChatId = crypto.randomUUID();
 
-    const newChat: ActiveChat = { ...sourceChat, id: newChatId, lastUpdate: Date.now() };
+    const rootChatId = sourceChat.rootChatId || sourceChat.id;
+      const newChat: ActiveChat = {
+        ...sourceChat,
+        id: newChatId,
+        lastUpdate: Date.now(),
+        rootChatId: rootChatId,
+        parentId: sourceChat.id,
+        forkedAtMessageId: messageId
+      };
     setActiveChats(prev => [newChat, ...prev]);
     saveToStorageAsync(ACTIVE_CHATS_KEY, [newChat, ...activeChats]);
     saveToStorageAsync(CHAT_HISTORY_PREFIX + newChatId, branchedHistory);
@@ -607,7 +625,19 @@ const App: React.FC = () => {
       break;
     case 'story_view':
       if (currentChat) {
-        content = <StoryView chat={currentChat} onExit={handleExitStory} onUpdateUserCharacter={handleUpdateUserCharacter} onBranchChat={handleBranchChat} />;
+        content = <StoryView
+            chat={currentChat}
+            allChats={activeChats}
+            onUpdateChat={(updatedChat) => {
+              const updatedChats = activeChats.map(c => c.id === updatedChat.id ? updatedChat : c);
+              setActiveChats(updatedChats);
+              saveToStorageAsync(ACTIVE_CHATS_KEY, updatedChats);
+              if (currentChat?.id === updatedChat.id) setCurrentChat(updatedChat);
+            }}
+            onExit={handleExitStory}
+            onUpdateUserCharacter={handleUpdateUserCharacter}
+            onBranchChat={handleBranchChat}
+          />;
       } else {
         setCurrentScreen('scenario_selector'); // Failsafe
       }
