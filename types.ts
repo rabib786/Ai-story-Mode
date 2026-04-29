@@ -64,7 +64,7 @@ export interface ActiveChat {
   scenario: Scenario;
   userCharacter: UserCharacter;
   lastUpdate: number;
-  memoryBank: string[];
+  memoryBank: MemoryEntry[];
 }
 
 export type ApiProvider =
@@ -91,4 +91,16 @@ export interface ApiSettings {
   openAiCompatibleApiKey: string;
   openAiCompatibleBaseUrl: string;
   openAiCompatibleModel: string;
+}
+
+export type MemoryType = 'fact' | 'relationship' | 'hook';
+
+export interface MemoryEntry {
+  id: string;
+  content: string;
+  type: MemoryType;
+  confidence: number;
+  timestamp: number;
+  sourceTurnId?: string;
+  locked: boolean;
 }
