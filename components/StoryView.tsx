@@ -5,7 +5,7 @@ import { ChatMessage, ActiveChat, ModelResponsePart, UserCharacter, Scenario, Ap
 import { generateStoryPart } from '../services/geminiService';
 import { parseApiResponse, parseNarrative } from '../services/storyUtils';
 import { type GenerateContentResponse } from '@google/genai';
-import { SendIcon, ArrowLeftIcon, RefreshCwIcon, SettingsIcon, EyeIcon, StarIcon, ChevronLeftIcon, ChevronRightIcon, LightbulbIcon, UserIcon, Volume2Icon, StopCircleIcon, ChevronsRightIcon, Trash2Icon, Undo2Icon, MoreHorizontalIcon } from './icons';
+import { SendIcon, ArrowLeftIcon, RefreshCwIcon, SettingsIcon, EyeIcon, StarIcon, ChevronLeftIcon, ChevronRightIcon, LightbulbIcon, UserIcon, Volume2Icon, StopCircleIcon, ChevronsRightIcon, Trash2Icon, Undo2Icon, MoreHorizontalIcon, ScissorsIcon, FlameIcon, GitBranchIcon, InfoIcon } from './icons';
 import { CHAT_HISTORY_PREFIX, API_SETTINGS_KEY } from '../constants/storageKeys';
 import StorySettingsModal from './StorySettingsModal';
 import CharacterCreation from './CharacterCreation';

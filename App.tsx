@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useEffect, Suspense } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
-import { Scenario, UserCharacter, ActiveChat } from './types';
+import { Scenario, UserCharacter, ActiveChat, MemoryEntry } from './types';
 const ScenarioSelector = React.lazy(() => import('./components/ScenarioSelector'));
 const StoryView = React.lazy(() => import('./components/StoryView'));
 const CharacterSelector = React.lazy(() => import('./components/CharacterSelector'));
@@ -127,7 +127,14 @@ const App: React.FC = () => {
     try {
       const savedChats = localStorage.getItem(ACTIVE_CHATS_KEY);
       if (savedChats) {
-        setActiveChats(JSON.parse(savedChats));
+        const parsedChats = JSON.parse(savedChats);
+        const migratedChats = parsedChats.map((c: any) => ({
+          ...c,
+          memoryBank: (c.memoryBank || []).map((m: any) =>
+            typeof m === 'string' ? { id: crypto.randomUUID(), content: m, type: 'fact', confidence: 1, timestamp: Date.now(), locked: false } : m
+          )
+        }));
+        setActiveChats(migratedChats);
       }
     } catch (error) {
       console.error("Failed to load or parse active chats:", error);
@@ -256,6 +263,26 @@ const App: React.FC = () => {
     setCurrentChat(chatToResume);
     setCurrentScreen('story_view');
   }, []);
+
+  const handleBranchChat = useCallback(async (chatId: string, messageId: string) => {
+    const sourceChat = activeChats.find(c => c.id === chatId);
+    if (!sourceChat) return;
+
+    // Get chat history for branching
+    const historyRaw = localStorage.getItem(CHAT_HISTORY_PREFIX + chatId);
+    const history = historyRaw ? JSON.parse(historyRaw) : [];
+    const splitIndex = history.findIndex((m: any) => m.id === messageId);
+    if (splitIndex === -1) return;
+
+    const branchedHistory = history.slice(0, splitIndex + 1);
+    const newChatId = crypto.randomUUID();
+
+    const newChat: ActiveChat = { ...sourceChat, id: newChatId, lastUpdate: Date.now() };
+    setActiveChats(prev => [newChat, ...prev]);
+    saveToStorageAsync(ACTIVE_CHATS_KEY, [newChat, ...activeChats]);
+    saveToStorageAsync(CHAT_HISTORY_PREFIX + newChatId, branchedHistory);
+    setCurrentChat(newChat);
+  }, [activeChats]);
 
   const handleDeleteChat = useCallback((chatId: string) => {
     setConfirmation({
@@ -580,7 +607,7 @@ const App: React.FC = () => {
       break;
     case 'story_view':
       if (currentChat) {
-        content = <StoryView chat={currentChat} onExit={handleExitStory} onUpdateUserCharacter={handleUpdateUserCharacter} />;
+        content = <StoryView chat={currentChat} onExit={handleExitStory} onUpdateUserCharacter={handleUpdateUserCharacter} onBranchChat={handleBranchChat} />;
       } else {
         setCurrentScreen('scenario_selector'); // Failsafe
       }

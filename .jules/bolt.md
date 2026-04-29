@@ -19,3 +19,7 @@
 ## 2026-04-28 - Unsafe State Initialization leading to app crashes
 **Learning:** Discovered a crash caused by initializing React state with an undefined value from a complex object `useState<string[]>(chat.memoryBank)` when legacy or mocked data might be missing that field. When an empty array wasn't provided as a fallback, subsequent array operations (`.slice`, `.map`) threw uncaught TypeError exceptions upon rendering or data handling.
 **Action:** Always provide a robust fallback when initializing state from external or potentially unmigrated data sources, e.g., `useState<string[]>(chat.memoryBank || [])`. Additionally, apply safe access patterns like `(finalMemoryBank || []).slice()` when executing operations on passed data that could unexpectedly be null/undefined.
+
+- When updating a complex data structure that acts as a dependency array across the application (like `MemoryBank`), ensure any data migrations (e.g. from `string[]` to `MemoryEntry[]`) occur before UI is rendered and check thoroughly for areas that may expect the old type. Ensure proper mapping of generated items back to object arrays.
+- Avoid modifying objects by reference directly inside React `useState` hooks. Always copy the existing object or array `[...memories]` before mutating to avoid unexpected re-rendering behaviors.
+- In long sequences of changes, track unstaged work meticulously using simple git patch steps, and avoid usage of `git reset --hard` when uncommitted work may not be recoverable via stashing or reflog.
