@@ -206,7 +206,7 @@ export async function generateStoryPart(
     }, 'gemini');
 }
 
-async function generateWithOpenAiCompatible(
+export async function generateWithOpenAiCompatible(
   systemInstruction: string,
   contents: Content[],
   settings: { apiSettings: ApiSettings }
@@ -420,3 +420,5 @@ export async function generateCharacterPortrait(name: string, description: strin
         throw new Error("Failed to generate character portrait. The service may be unavailable or the request was blocked.");
     }
 }
+
+export { generateStoryPart as generateStoryContinuation };

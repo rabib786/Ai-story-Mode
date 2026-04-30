@@ -220,7 +220,9 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, allChats, onExit, onUpdateU
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [memoryBank, setMemoryBank] = useState<string[]>(chat.memoryBank || []);
+  const [memoryBank, setMemoryBank] = useState<string[]>(
+    chat.memoryBank ? chat.memoryBank.map(mem => mem.content) : []
+  );
   const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
   const [isCharacterModalOpen, setCharacterModalOpen] = useState(false);
   const [isMemoryBankModalOpen, setMemoryBankModalOpen] = useState(false);
@@ -254,8 +256,8 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, allChats, onExit, onUpdateU
   const [dominantEmotion, setDominantEmotion] = useState<string | null>(null);
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const prevSettingsRef = useRef<StorySettings>();
-  const prevUserCharacterRef = useRef<UserCharacter>();
+  const prevSettingsRef = useRef<StorySettings | undefined>(undefined);
+  const prevUserCharacterRef = useRef<UserCharacter | undefined>(undefined);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
   const recalculateMemoryBankFromHistory = useCallback((history: ChatMessage[]): string[] => {
@@ -384,7 +386,12 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, allChats, onExit, onUpdateU
         setChatHistory([{ id: messageId, role: 'model', parts: [emptyPart], currentPartIndex: 0 }]);
         
         try {
-          const response = await generateStoryPart(chat.scenario, chat.userCharacter, [], chat.memoryBank, "Begin the story.", { ...settings, apiSettings });
+          const response = await generateStoryPart(chat.scenario, chat.userCharacter, [], chat.memoryBank.map(mem => mem.content), "Begin the story.", {
+            responseLength: settings.responseLength,
+            customInstructions: settings.customLlmInstructions,
+            model: settings.model,
+            apiSettings
+          });
           const finalPart = parseApiResponse(response);
 
           if (finalPart) {
@@ -524,7 +531,12 @@ useEffect(() => {
     setChatHistory([...newHistory, modelMessagePlaceholder]);
 
     try {
-      const response = await generateStoryPart(chat.scenario, chat.userCharacter, newHistory, memoryBank, textToSend, { ...settings, apiSettings });
+      const response = await generateStoryPart(chat.scenario, chat.userCharacter, newHistory, memoryBank, textToSend, {
+        responseLength: settings.responseLength,
+        customInstructions: settings.customLlmInstructions,
+        model: settings.model,
+        apiSettings
+      });
       const finalPart = parseApiResponse(response);
       
       if (finalPart) {
@@ -581,7 +593,12 @@ useEffect(() => {
     try {
         const historyForRegen = chatHistory.slice(0, userMessageIndex);
         const memoryForRegen = recalculateMemoryBankFromHistory(historyForRegen);
-        const response = await generateStoryPart(chat.scenario, chat.userCharacter, historyForRegen, memoryForRegen, userMessage.text!, { ...settings, apiSettings });
+        const response = await generateStoryPart(chat.scenario, chat.userCharacter, historyForRegen, memoryForRegen, userMessage.text!, {
+          responseLength: settings.responseLength,
+          customInstructions: settings.customLlmInstructions,
+          model: settings.model,
+          apiSettings
+        });
         const newPart = parseApiResponse(response);
 
         if (newPart) {
@@ -633,7 +650,12 @@ useEffect(() => {
     setChatHistory(prev => [...prev, modelMessagePlaceholder]);
 
     try {
-      const response = await generateStoryPart(chat.scenario, chat.userCharacter, chatHistory, memoryBank, continueInstruction, { ...settings, apiSettings });
+      const response = await generateStoryPart(chat.scenario, chat.userCharacter, chatHistory, memoryBank, continueInstruction, {
+        responseLength: settings.responseLength,
+        customInstructions: settings.customLlmInstructions,
+        model: settings.model,
+        apiSettings
+      });
       const finalPart = parseApiResponse(response);
       
       if (finalPart) {
@@ -815,7 +837,7 @@ useEffect(() => {
               onRegenerate={index === lastActionableModelMessageIndex ? handleRegenerate : undefined}
               onContinue={index === lastActionableModelMessageIndex ? handleContinue : undefined}
               onDeleteLastResponse={index === lastActionableModelMessageIndex ? handleDeleteLastResponse : undefined}
-                onBranch={onBranchChat}
+                onBranch={(messageId) => onBranchChat(chat.id, messageId)}
                 />
           )
         ))}

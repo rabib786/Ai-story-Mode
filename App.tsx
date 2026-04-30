@@ -258,8 +258,18 @@ const App: React.FC = () => {
 
   const handleExitStory = useCallback((finalMemoryBank: string[]) => {
     if (currentChat) {
+      // Convert string[] to MemoryEntry[]
+      const memoryEntries: MemoryEntry[] = (finalMemoryBank || []).slice(-50).map((content, index) => ({
+        id: `mem-${Date.now()}-${index}`,
+        content,
+        type: 'fact' as const,
+        confidence: 1.0,
+        timestamp: Date.now(),
+        locked: false
+      }));
+      
       const updatedChats = activeChats.map(c =>
-        c.id === currentChat.id ? { ...c, lastUpdate: Date.now(), memoryBank: (finalMemoryBank || []).slice(-50) } : c
+        c.id === currentChat.id ? { ...c, lastUpdate: Date.now(), memoryBank: memoryEntries } : c
       );
       updatedChats.sort((a, b) => b.lastUpdate - a.lastUpdate);
       setActiveChats(updatedChats);
@@ -336,7 +346,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const backButtonListener = CapacitorApp.addListener('backButton', () => {
       if (currentScreen === 'story_view') {
-        handleExitStory(currentChat?.memoryBank || []);
+        handleExitStory((currentChat?.memoryBank || []).map(entry => entry.content));
       } else if (
         currentScreen === 'scenario_editor' ||
         currentScreen === 'profile' ||

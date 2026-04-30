@@ -4,6 +4,7 @@ import { Scenario, ScenarioCharacter } from '../types';
 import { PlusIcon, Trash2Icon, UserIcon, ArrowLeftIcon, InfoIcon, XIcon, CheckIcon, EditIcon, RefreshCwIcon, Wand2Icon, AlertTriangleIcon } from './icons';
 import ScenarioCharacterEditor from './ScenarioCharacterEditor';
 import { analyzeDescription, analyzeWorldDetails, checkFormattingIssues, Suggestion } from '../services/scenarioSuggestions';
+import SuggestionBox from './SuggestionBox';
 
 interface ScenarioEditorProps {
   onSave: (scenario: Scenario) => void;
