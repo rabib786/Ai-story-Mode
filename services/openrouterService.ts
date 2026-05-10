@@ -45,7 +45,7 @@ function isFreeModel(model: OpenRouterModel): boolean {
   );
 }
 
-export function getOpenRouterHeaders(apiKey: string): Record<string, string> {
+function getOpenRouterHeaders(apiKey: string): Record<string, string> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${apiKey}`,
