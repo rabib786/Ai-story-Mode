@@ -200,8 +200,9 @@ const App: React.FC = () => {
     }
 
     // Sync character updates to any active chats using them
+    const characterMap = new Map(updatedCharacters.map(char => [char.id, char]));
     const updatedActiveChats = activeChats.map(chat => {
-        const correspondingUpdatedChar = updatedCharacters.find(uc => uc.id === chat.userCharacter.id);
+        const correspondingUpdatedChar = characterMap.get(chat.userCharacter.id);
         // If the character in the chat exists in the updated global list, sync it.
         if (correspondingUpdatedChar) {
             return { ...chat, userCharacter: correspondingUpdatedChar };
