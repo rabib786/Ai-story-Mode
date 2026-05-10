@@ -3,7 +3,7 @@ import { getDraft, saveDraft, clearDraft } from '../services/draftService';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ChatMessage, ActiveChat, ModelResponsePart, UserCharacter, Scenario, ApiSettings } from '../types';
 import { generateStoryPart } from '../services/geminiService';
-import { parseApiResponse, parseNarrative } from '../services/storyUtils';
+import { parseApiResponse, parseNarrative, escapeHtml } from '../services/storyUtils';
 import { type GenerateContentResponse } from '@google/genai';
 import { SendIcon, ArrowLeftIcon, RefreshCwIcon, SettingsIcon, EyeIcon, StarIcon, ChevronLeftIcon, ChevronRightIcon, LightbulbIcon, UserIcon, Volume2Icon, StopCircleIcon, ChevronsRightIcon, Trash2Icon, Undo2Icon, MoreHorizontalIcon, ScissorsIcon, FlameIcon, GitBranchIcon, InfoIcon, TargetIcon, NetworkIcon } from './icons';
 import { CHAT_HISTORY_PREFIX, API_SETTINGS_KEY } from '../constants/storageKeys';
@@ -76,7 +76,7 @@ function findLast<T>(arr: T[], predicate: (val: T, index: number, obj: T[]) => b
 }
 
 const emptyPart: ModelResponsePart = { narrative: '', suggestedActions: [] };
-const errorNarrative = `<i class="text-red-400 text-center block w-full">Sorry, the AI failed to respond. Please try regenerating or rewinding.</i>`;
+const errorNarrative = `Sorry, the AI failed to respond. Please try regenerating or rewinding.`;
 
 
 
@@ -138,19 +138,19 @@ const ModelMessageBubble = React.memo(({
 }: ModelMessageBubbleProps) => {
     const currentPart = message.parts ? message.parts[message.currentPartIndex] : null;
     const narrativeToRender = currentPart?.narrative || '';
-    const isSystemMessage = narrativeToRender.startsWith('<i class');
+    const isSystemMessage = message.type === 'system' || message.type === 'error';
     
     return (
         <div 
             className="flex items-start gap-3 my-2 animate-slide-in-up"
         >
             {/* If it's a system message, don't show the avatar */}
-            {message.type === 'system' ? <div className="w-10 flex-shrink-0" /> : <img src={scenario.image || `https://source.unsplash.com/random/40x40?${scenario.tags[0]}`} alt="Scenario" className="w-10 h-10 rounded-full flex-shrink-0" loading="lazy" crossOrigin="anonymous" referrerPolicy="no-referrer" /> }
+            {message.type === 'system' || message.type === 'error' ? <div className="w-10 flex-shrink-0" /> : <img src={scenario.image || `https://source.unsplash.com/random/40x40?${scenario.tags[0]}`} alt="Scenario" className="w-10 h-10 rounded-full flex-shrink-0" loading="lazy" crossOrigin="anonymous" referrerPolicy="no-referrer" /> }
             <div className="flex-grow flex flex-col items-start">
                 <div className="w-full max-w-[95%] sm:max-w-3xl leading-relaxed text-slate-300 prose prose-invert prose-p:text-slate-300 bg-zinc-900 border border-zinc-800 p-3 sm:p-4 rounded-2xl rounded-bl-lg transition-all duration-300">
                     {narrativeToRender ? (
                         isSystemMessage ? (
-                          <div dangerouslySetInnerHTML={{ __html: narrativeToRender }} />
+                          <div className={message.type === 'error' ? "text-red-400 text-center block w-full italic" : "text-slate-400 text-center block w-full italic"} dangerouslySetInnerHTML={{ __html: narrativeToRender }} />
                         ) : (
                           <p>
                             {parseNarrative(narrativeToRender).map((part, index) =>
@@ -284,7 +284,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, allChats, onExit, onUpdateU
         const systemMessage: ChatMessage = {
           id: `system-settings-${crypto.randomUUID()}`,
           role: 'model', type: 'system',
-          parts: [{ narrative: `<i class="text-slate-400 text-center block w-full">Settings updated.</i>`, suggestedActions: [] }],
+          parts: [{ narrative: `Settings updated.`, suggestedActions: [] }],
           currentPartIndex: 0,
         };
         setChatHistory(prev => [...prev, systemMessage]);
@@ -297,7 +297,7 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, allChats, onExit, onUpdateU
         const systemMessage: ChatMessage = {
             id: `system-char-${crypto.randomUUID()}`,
             role: 'model', type: 'system',
-            parts: [{ narrative: `<i class="text-slate-400 text-center block w-full">Character updated to ${chat.userCharacter.name}.</i>`, suggestedActions: [] }],
+            parts: [{ narrative: `Character updated to ${chat.userCharacter.name}.`, suggestedActions: [] }],
             currentPartIndex: 0,
         };
         setChatHistory(prev => [...prev, systemMessage]);
@@ -308,27 +308,27 @@ const StoryView: React.FC<StoryViewProps> = ({ chat, allChats, onExit, onUpdateU
   
   const handleApiError = useCallback((messageId: string, error?: any) => {
      if (error) console.error("API Error:", error);
-     let errorMessage = '<i class="text-red-400">The story encountered an error. Please try again.</i>';
+     let errorMessage = 'The story encountered an error. Please try again.';
 
      if (error?.name === 'ApiError') {
          switch (error.code) {
             case 'AUTH_ERROR':
-                errorMessage = `<i class="text-amber-400 block w-full text-center">Authentication failed. Please check your API key in settings.</i>`;
+                errorMessage = `Authentication failed. Please check your API key in settings.`;
                 break;
             case 'QUOTA_ERROR':
-                errorMessage = `<i class="text-amber-400 block w-full text-center">API quota exceeded or rate limited. Please check your billing or wait a moment.</i>`;
+                errorMessage = `API quota exceeded or rate limited. Please check your billing or wait a moment.`;
                 break;
             case 'MODEL_ERROR':
-                errorMessage = `<i class="text-amber-400 block w-full text-center">The selected model is unavailable or incorrect. Please check your settings.</i>`;
+                errorMessage = `The selected model is unavailable or incorrect. Please check your settings.`;
                 break;
             case 'TIMEOUT_ERROR':
-                errorMessage = `<i class="text-amber-400 block w-full text-center">The connection timed out or the server is unreachable. Please try again.</i>`;
+                errorMessage = `The connection timed out or the server is unreachable. Please try again.`;
                 break;
             default:
-                errorMessage = `<i class="text-red-400 block w-full text-center">${error.message || 'An unknown API error occurred. Please try again.'}</i>`;
+                errorMessage = `${escapeHtml(error.message) || 'An unknown API error occurred. Please try again.'}`;
          }
      } else if (error?.message) {
-         errorMessage = `<i class="text-red-400 block w-full text-center">${error.message}</i>`;
+         errorMessage = `${escapeHtml(error.message)}`;
      }
 
      setChatHistory(prev => {
@@ -627,7 +627,7 @@ useEffect(() => {
             id: `system-error-${crypto.randomUUID()}`,
             role: 'model', 
             type: 'system', 
-            parts: [{ narrative: `<i class="text-amber-400 text-center block w-full">Failed to regenerate. Please try again.</i>`, suggestedActions: []}], 
+            parts: [{ narrative: `Failed to regenerate. Please try again.`, suggestedActions: []}],
             currentPartIndex: 0 
         };
         setChatHistory(prev => [...prev, errorMsg]);

@@ -118,6 +118,26 @@ describe("storyUtils", () => {
         dominantEmotion: "mystery"
       });
     });
+
+    test("should sanitize HTML in narrative and strip in arrays", () => {
+      const mockResponse: GenerateContentResponse = {
+        text: JSON.stringify({
+          narrative: "Hello <script>alert(1)</script> <dialogue>Hi!</dialogue> <img src=x onerror=alert(1)>",
+          suggested_actions: ["Action <svg onload=alert(1)>", "Safe action"],
+          memory_additions: ["Fact <iframe src='javascript:alert(1)'></iframe>"],
+          dominant_emotion: "joy"
+        }),
+      } as any;
+
+      const result = parseApiResponse(mockResponse);
+
+      expect(result).toEqual({
+        narrative: "Hello &lt;script&gt;alert(1)&lt;/script&gt; <dialogue>Hi!</dialogue> &lt;img src=x onerror=alert(1)&gt;",
+        suggestedActions: ["Action ", "Safe action"],
+        memoryAdditions: ["Fact "],
+        dominantEmotion: "joy"
+      });
+    });
   });
 
   describe("parseNarrative", () => {

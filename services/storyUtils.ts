@@ -36,6 +36,35 @@ export const parseNarrative = (narrative: string): Array<{type: 'text' | 'dialog
 };
 
 /**
+ * Safely escapes HTML special characters.
+ */
+export const escapeHtml = (unsafe: string): string => {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+};
+
+/**
+ * Strips all HTML tags from a string.
+ */
+export const stripAllHtml = (text: string): string => {
+  return text.replace(/<[^>]*>?/gm, '');
+};
+
+/**
+ * Sanitizes the AI narrative by escaping all HTML except for <dialogue> tags.
+ */
+export const sanitizeAiNarrative = (text: string): string => {
+  if (!text) return '';
+  return escapeHtml(text)
+    .replace(/&lt;dialogue&gt;/gi, '<dialogue>')
+    .replace(/&lt;\/dialogue&gt;/gi, '</dialogue>');
+};
+
+/**
  * Parses the AI response from Gemini/OpenAI-compatible APIs.
  */
 export const parseApiResponse = (response: GenerateContentResponse): ModelResponsePart | null => {
@@ -64,7 +93,7 @@ export const parseApiResponse = (response: GenerateContentResponse): ModelRespon
     const data = JSON.parse(extractJsonPayload(cleanedText));
 
     const newPart: ModelResponsePart = {
-      narrative: typeof data.narrative === 'string' ? data.narrative : '',
+      narrative: typeof data.narrative === 'string' ? sanitizeAiNarrative(data.narrative) : '',
       suggestedActions: normalizeStringArray(data.suggested_actions),
       memoryAdditions: normalizeStringArray(data.memory_additions),
       dominantEmotion: typeof data.dominant_emotion === 'string' && data.dominant_emotion.trim() ? data.dominant_emotion : 'neutral',
@@ -128,6 +157,6 @@ function normalizeStringArray(value: unknown): string[] {
 
   return value
     .filter((item): item is string => typeof item === 'string')
-    .map((item) => item.trim())
+    .map((item) => stripAllHtml(item.trim()))
     .filter((item) => item.length > 0);
 }
