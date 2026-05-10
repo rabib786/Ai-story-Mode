@@ -131,3 +131,40 @@ function normalizeStringArray(value: unknown): string[] {
     .map((item) => item.trim())
     .filter((item) => item.length > 0);
 }
+
+export const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Checks if a string is a valid UUID.
+ */
+export const isValidUuid = (id: string): boolean => {
+  return UUID_REGEX.test(id.trim());
+};
+
+/**
+ * Migrates a scenario ID to the standard 'custom-UUID' format.
+ */
+export const migrateScenarioId = (id: string): { migratedId: string, wasUpdated: boolean } => {
+  const currentId = String(id || '').trim();
+
+  if (currentId.toLowerCase().startsWith('custom-')) {
+    const uuidPart = currentId.substring(7); // Remove 'custom-' prefix (7 chars)
+    if (isValidUuid(uuidPart)) {
+      const normalizedId = `custom-${uuidPart.trim().toLowerCase()}`;
+      return {
+        migratedId: normalizedId,
+        wasUpdated: currentId !== normalizedId
+      };
+    }
+  } else if (isValidUuid(currentId)) {
+    return {
+      migratedId: `custom-${currentId.trim().toLowerCase()}`,
+      wasUpdated: true
+    };
+  }
+
+  return {
+    migratedId: `custom-${crypto.randomUUID()}`,
+    wasUpdated: true
+  };
+};
