@@ -14,6 +14,7 @@ const ChatsScreen = React.lazy(() => import('./components/ChatsScreen'));
 import { ACTIVE_CHATS_KEY, SCENARIOS_KEY, CHAT_HISTORY_PREFIX, USER_CHARACTERS_KEY, DELETED_PREBUILT_SCENARIOS_KEY } from './constants/storageKeys';
 import { UserCircleIcon, BookOpenIcon } from './components/icons';
 import { saveToStorageAsync } from './services/storage';
+import { isValidUuid, migrateScenarioId } from './services/storyUtils';
 const ScenarioDetailView = React.lazy(() => import('./components/ScenarioDetailView'));
 const ConfirmationModal = React.lazy(() => import('./components/ConfirmationModal'));
 const AlertModal = React.lazy(() => import('./components/AlertModal'));
@@ -35,8 +36,6 @@ interface AlertState {
   title: string;
   message: string;
 }
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const Header: React.FC<HeaderProps> = ({ onProfileClick }) => (
   <header className="fixed top-0 left-0 right-0 h-16 bg-black/80 backdrop-blur-lg border-b border-zinc-800 z-40 flex items-center justify-between px-4 sm:px-6">
@@ -103,19 +102,12 @@ const App: React.FC = () => {
         
         // BUG FIX: Use robust UUID check for migrating custom scenario IDs
         const migratedCustomScenarios = customScenarios.map(s => {
-          const currentId = String(s.id || '');
-          if (currentId.startsWith('custom-')) {
-            const uuidPart = currentId.replace('custom-', '');
-            if (UUID_REGEX.test(uuidPart)) {
-              return s;
-            }
-          } else if (UUID_REGEX.test(currentId)) {
+          const { migratedId, wasUpdated: idWasUpdated } = migrateScenarioId(s.id);
+          if (idWasUpdated) {
             wasUpdated = true;
-            return { ...s, id: `custom-${currentId}` };
+            return { ...s, id: migratedId };
           }
-
-          wasUpdated = true;
-          return { ...s, id: `custom-${crypto.randomUUID()}` };
+          return s;
         });
         if (wasUpdated) {
           saveToStorageAsync(SCENARIOS_KEY, migratedCustomScenarios);
@@ -158,7 +150,7 @@ const App: React.FC = () => {
         let characters: UserCharacter[] = JSON.parse(savedCharactersRaw);
         let wasUpdated = false;
         characters = characters.map(c => {
-            if (!c.id || !UUID_REGEX.test(c.id)) {
+            if (!c.id || !isValidUuid(c.id)) {
                 wasUpdated = true;
                 return { ...c, id: crypto.randomUUID() };
             }
